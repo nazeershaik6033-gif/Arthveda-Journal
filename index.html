@@ -2947,10 +2947,12 @@ function renderSettings() {
     <!-- IMPORT -->
     <div class="section-panel">
       <h3 class="section-panel-title">📥 Import</h3>
-      <p class="section-panel-desc">Import trades from your broker tradebook or add holdings in bulk.</p>
+      <p class="section-panel-desc">Import trades from your broker tradebook, MyTrades backup, or add holdings in bulk.</p>
       <div class="btn-row">
+        <button class="btn btn-secondary" onclick="document.getElementById('myTradesInput').click()">⬆ Import MyTrades Backup (.json)</button>
         <button class="btn btn-secondary" onclick="document.getElementById('zerodhaInput').click()">⬆ Import Zerodha Tradebook (.xlsx)</button>
         <button class="btn btn-secondary" onclick="openBulkHoldingsModal()">⬆ Bulk Holdings Import</button>
+        <input type="file" id="myTradesInput" accept=".json" style="display: none;" onchange="importMyTradesBackup(event)">
         <input type="file" id="zerodhaInput" accept=".xlsx" style="display: none;" onchange="importZerodhaTradebook(event)">
       </div>
     </div>
@@ -3440,6 +3442,255 @@ function clearAllDataPrompt() {
     },
     'Yes, delete everything'
   );
+}
+
+/* ========================================================================
+   MYTRADES JSON IMPORTER
+   MyTrades structure:
+   {
+     trades: {
+       live:   { stocks: [...], futures: [...], options: [...] },
+       closed: { stocks: [...], futures: [...], options: [...] }
+     },
+     portfolio: { core: { stocks: [...] }, satellite: { stocks: [...] } }  // optional
+   }
+   Each trade: { id, before: { symbol, price, qty, datetime, description, image },
+                           after: { symbol, price, qty, datetime, pl, description }, closedAt, addedFrom }
+   ======================================================================== */
+async function importMyTradesBackup(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  let raw;
+  try {
+    raw = JSON.parse(await file.text());
+  } catch (e) {
+    return showToast('Could not parse JSON: ' + e.message, 'error');
+  }
+
+  // ---------- extract all trade groups ----------
+  const tradesRoot = raw.trades || raw;
+  const liveBlock   = tradesRoot.live   || {};
+  const closedBlock = tradesRoot.closed || {};
+
+  const CATS = ['stocks', 'futures', 'options'];
+
+  const liveTrades   = [];
+  const closedTrades = [];
+
+  CATS.forEach(cat => {
+    (liveBlock[cat]   || []).forEach(t => liveTrades.push({   ...t, _cat: cat }));
+    (closedBlock[cat] || []).forEach(t => closedTrades.push({ ...t, _cat: cat }));
+  });
+
+  // ---------- also extract portfolio holdings if present ----------
+  // MyTrades stores core/satellite holdings separately
+  const portfolioRoot = raw.portfolio || raw.holdings || {};
+  const coreItems = [];
+  const satItems  = [];
+  CATS.forEach(cat => {
+    ((portfolioRoot.core      || {})[cat] || []).forEach(p => coreItems.push({ ...p, _cat: cat }));
+    ((portfolioRoot.satellite || {})[cat] || []).forEach(p => satItems.push({  ...p, _cat: cat }));
+  });
+
+  const totalTrades   = liveTrades.length + closedTrades.length;
+  const totalHoldings = coreItems.length  + satItems.length;
+
+  if (totalTrades === 0 && totalHoldings === 0) {
+    return showToast('No trades or holdings found in this MyTrades backup', 'error');
+  }
+
+  // ---------- default portfolio assignment per status ----------
+  // live → satellite open, closed → satellite closed
+  // core portfolio items → core, satellite portfolio items → satellite open
+  // User can override via the modal dropdowns
+  let liveAssign   = 'satellite';
+  let closedAssign = 'satellite';
+
+  // Build preview rows (first 5 live, first 5 closed)
+  const previewLive   = liveTrades.slice(0, 5);
+  const previewClosed = closedTrades.slice(0, 5);
+
+  const previewRow = (t, status) => `
+    <tr>
+      <td>${escapeHtml(t.before?.symbol || '—')}</td>
+      <td>${escapeHtml(t._cat)}</td>
+      <td class="mono">${formatINR(t.before?.price)}</td>
+      <td>${t.before?.qty || '—'}</td>
+      <td class="mono ${status === 'closed' ? pnlClass(t.after?.pl) : ''}">${status === 'closed' ? formatPnl(t.after?.pl) : '—'}</td>
+      <td style="color: var(--text-muted); font-size: 11px;">${(t.before?.datetime || '').slice(0,10)}</td>
+    </tr>
+  `;
+
+  showModal({
+    title: 'Import MyTrades Backup',
+    size: 'lg',
+    body: `
+      <!-- Summary -->
+      <div class="confirm-grid" style="margin-bottom: 16px;">
+        <div class="confirm-grid-item"><div class="lbl">Live / Open Trades</div><div class="val">${liveTrades.length}</div></div>
+        <div class="confirm-grid-item"><div class="lbl">Closed Trades</div><div class="val">${closedTrades.length}</div></div>
+        <div class="confirm-grid-item"><div class="lbl">Core Holdings</div><div class="val">${coreItems.length}</div></div>
+        <div class="confirm-grid-item"><div class="lbl">Satellite Holdings</div><div class="val">${satItems.length}</div></div>
+      </div>
+
+      <!-- Portfolio assignment -->
+      <div style="background: var(--surface-3); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+        <p style="margin: 0 0 10px; font-size: 13px; font-weight: 600;">Assign to portfolio</p>
+        <div class="form-row" style="gap: 10px;">
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label">Live / Open Trades →</label>
+            <select class="form-select" id="mt-live-assign" style="font-size: 12px; padding: 6px 10px;">
+              <option value="satellite">Satellite (Open)</option>
+              <option value="core">Core Holdings</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label class="form-label">Closed Trades →</label>
+            <select class="form-select" id="mt-closed-assign" style="font-size: 12px; padding: 6px 10px;">
+              <option value="satellite">Satellite (Closed)</option>
+              <option value="core">Core Holdings</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview: Live -->
+      ${liveTrades.length ? `
+        <p style="font-size: 12px; font-weight: 600; color: var(--warning); margin: 0 0 6px;">
+          Open Trades (${liveTrades.length} total, showing first 5)
+        </p>
+        <div class="table-wrap" style="margin-bottom: 14px;">
+          <table class="data-table" style="font-size: 11px;">
+            <thead><tr><th>Symbol</th><th>Cat</th><th>Entry ₹</th><th>Qty</th><th>P&L</th><th>Date</th></tr></thead>
+            <tbody>${previewLive.map(t => previewRow(t, 'live')).join('')}</tbody>
+          </table>
+          ${liveTrades.length > 5 ? `<p style="color: var(--text-subtle); font-size: 11px; margin: 6px 0 0;">...and ${liveTrades.length - 5} more</p>` : ''}
+        </div>
+      ` : ''}
+
+      <!-- Preview: Closed -->
+      ${closedTrades.length ? `
+        <p style="font-size: 12px; font-weight: 600; color: var(--success); margin: 0 0 6px;">
+          Closed Trades (${closedTrades.length} total, showing first 5)
+        </p>
+        <div class="table-wrap" style="margin-bottom: 14px;">
+          <table class="data-table" style="font-size: 11px;">
+            <thead><tr><th>Symbol</th><th>Cat</th><th>Entry ₹</th><th>Qty</th><th>P&L</th><th>Entry Date</th></tr></thead>
+            <tbody>${previewClosed.map(t => previewRow(t, 'closed')).join('')}</tbody>
+          </table>
+          ${closedTrades.length > 5 ? `<p style="color: var(--text-subtle); font-size: 11px; margin: 6px 0 0;">...and ${closedTrades.length - 5} more</p>` : ''}
+        </div>
+      ` : ''}
+
+      <!-- Warning -->
+      <div style="background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--warning);">
+        ⚠ Trades are <strong>added</strong> to your existing data — nothing is deleted. Duplicate trades from MyTrades will be tagged <code>mytrades-import</code> so you can identify them.
+      </div>
+    `,
+    footer: `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" id="confirmMtImportBtn">Import All (${totalTrades + totalHoldings})</button>
+    `
+  });
+
+  document.getElementById('confirmMtImportBtn').onclick = async () => {
+    const liveAssign   = document.getElementById('mt-live-assign').value;
+    const closedAssign = document.getElementById('mt-closed-assign').value;
+
+    let imported = 0;
+    const now = new Date().toISOString();
+
+    // ---------- map a MyTrades trade to Naz Trades trade ----------
+    const mapTrade = (t, status, portfolioType) => ({
+      id:            generateId(),
+      portfolioType,
+      status,
+      category:      t._cat || 'stocks',
+      symbol:        (t.before?.symbol || '').toUpperCase().trim(),
+      tradeName:     t.before?.name || '',
+      entryPrice:    parseFloat(t.before?.price)  || 0,
+      entryQty:      parseFloat(t.before?.qty)    || 0,
+      entryDate:     t.before?.datetime ? new Date(t.before.datetime).toISOString() : now,
+      entryDesc:     t.before?.description || '',
+      entryChart:    t.before?.image || null,
+      exitPrice:     status === 'closed' ? (parseFloat(t.after?.price)  || null) : null,
+      exitQty:       status === 'closed' ? (parseFloat(t.after?.qty)    || null) : null,
+      exitDate:      status === 'closed' ? (t.after?.datetime ? new Date(t.after.datetime).toISOString() : null) : null,
+      exitDesc:      t.after?.description || '',
+      exitChart:     t.after?.image || null,
+      realizedPnl:   status === 'closed' ? (parseFloat(t.after?.pl) || null) : null,
+      closedAt:      status === 'closed' ? (t.closedAt || now) : null,
+      tags:          ['mytrades-import', t.addedFrom === 'tradebook' ? 'zerodha' : 'mytrades'].filter(Boolean),
+      createdAt:     now
+    });
+
+    // ---------- map a MyTrades holding to Naz Trades portfolio item ----------
+    const mapHolding = (p) => ({
+      id:        generateId(),
+      symbol:    (p.before?.symbol || p.symbol || '').toUpperCase().trim(),
+      tradeName: p.before?.name || p.name || '',
+      qty:       parseFloat(p.before?.qty || p.qty) || 0,
+      avgPrice:  parseFloat(p.before?.price || p.price) || 0,
+      addedAt:   now
+    });
+
+    // ---------- import live trades ----------
+    liveTrades.forEach(t => {
+      if (!t.before?.symbol) return;
+      if (liveAssign === 'core') {
+        state.portfolio.push(mapHolding(t));
+      } else {
+        state.trades.push(mapTrade(t, 'open', 'satellite'));
+      }
+      imported++;
+    });
+
+    // ---------- import closed trades ----------
+    closedTrades.forEach(t => {
+      if (!t.before?.symbol) return;
+      if (closedAssign === 'core') {
+        state.portfolio.push(mapHolding(t));
+      } else {
+        state.trades.push(mapTrade(t, 'closed', 'satellite'));
+      }
+      imported++;
+    });
+
+    // ---------- import portfolio holdings ----------
+    coreItems.forEach(p => {
+      const sym = p.before?.symbol || p.symbol || '';
+      if (!sym) return;
+      state.portfolio.push(mapHolding(p));
+      imported++;
+    });
+    satItems.forEach(p => {
+      const sym = p.before?.symbol || p.symbol || '';
+      if (!sym) return;
+      state.trades.push({
+        id: generateId(),
+        portfolioType: 'satellite',
+        status: 'open',
+        category: p._cat || 'stocks',
+        symbol: sym.toUpperCase(),
+        tradeName: p.before?.name || p.name || '',
+        entryPrice: parseFloat(p.before?.price || p.price) || 0,
+        entryQty:   parseFloat(p.before?.qty   || p.qty)   || 0,
+        entryDate:  now,
+        entryDesc:  'Imported from MyTrades satellite portfolio',
+        entryChart: null,
+        tags: ['mytrades-import'],
+        createdAt: now
+      });
+      imported++;
+    });
+
+    await saveState();
+    closeModal();
+    showToast(`✅ Imported ${imported} item${imported === 1 ? '' : 's'} from MyTrades`, 'success', 4000);
+    switchTab('trades');
+  };
 }
 
 /* ========================================================================
