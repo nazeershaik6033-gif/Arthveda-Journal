@@ -13,7 +13,7 @@
 <title>Naz Trades</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Lato:wght@400;700&family=Open+Sans:wght@400;600&family=Nunito:wght@400;600;700&family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
@@ -82,8 +82,118 @@ body {
   from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-up { animation: fadeUp 0.4s ease-out both; }
-.animate-fade-in { animation: fadeIn 0.3s ease-out both; }
+/* ========================================================================
+   LIGHT MODE — override all CSS variables
+   ======================================================================== */
+html.light {
+  --bg: #f1f5f9;
+  --surface-0: #e8edf5;
+  --surface-1: #f1f5f9;
+  --surface-2: #ffffff;
+  --surface-3: #f1f5f9;
+  --surface-4: #e2e8f0;
+  --surface-5: #cbd5e1;
+  --border: #cbd5e1;
+  --border-subtle: #e2e8f0;
+  --border-soft: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #94a3b8;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-muted: rgba(79, 70, 229, 0.1);
+  --success: #16a34a;
+  --success-bg: rgba(22, 163, 74, 0.08);
+  --success-border: rgba(22, 163, 74, 0.25);
+  --error: #dc2626;
+  --error-bg: rgba(220, 38, 38, 0.08);
+  --error-border: rgba(220, 38, 38, 0.25);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.08);
+  --warning-border: rgba(217, 119, 6, 0.25);
+  --info: #2563eb;
+}
+html.light .header {
+  background: rgba(241, 245, 249, 0.9);
+}
+html.light .modal {
+  background: #ffffff;
+}
+html.light .modal-header { background: #ffffff; }
+html.light .bottom-dock {
+  background: rgba(241, 245, 249, 0.96);
+}
+html.light .trade-card,
+html.light .card,
+html.light .section-panel,
+html.light .calendar-wrap,
+html.light .stat-card {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Smooth theme transitions */
+*, *::before, *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.1s ease;
+}
+/* Exclude transitions on animations/transforms so they stay snappy */
+.animate-fade-up, .animate-fade-in, .market-dot { transition: none !important; }
+
+/* Sliders */
+.font-slider-wrap { display: flex; align-items: center; gap: 10px; }
+input[type=range].font-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 5px;
+  background: var(--surface-4);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+input[type=range].font-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--surface-2);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+input[type=range].font-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--surface-2);
+}
+.slider-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  min-width: 34px;
+  text-align: right;
+}
+.font-preview-text {
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.font-preview-num {
+  background: var(--surface-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
 
 /* Header */
 .header {
@@ -997,6 +1107,12 @@ table.data-table tr:last-child td { border-bottom: none; }
       <button class="icon-btn" id="quickAddBtn" title="Add Trade" aria-label="Add Trade">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
       </button>
+      <button class="icon-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle theme">
+        <!-- sun icon (shown in dark mode) -->
+        <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <!-- moon icon (shown in light mode) -->
+        <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
     </div>
   </div>
   <div class="market-banner">
@@ -1066,13 +1182,19 @@ const DEFAULT_STATE = {
   version: 2,
   trades: [],
   portfolio: [],
+  coreClosed: [],
   priority: [],
   watchlists: [{ id: 'w1', name: 'Default', symbols: [] }],
   strategies: [],
   settings: {
     exchange: 'NSE',
     autoRefresh: false,
-    refreshInterval: 5
+    refreshInterval: 5,
+    theme: 'dark',
+    textFont: 'Inter',
+    textSize: 14,
+    numFont: 'JetBrains Mono',
+    numSize: 13
   }
 };
 
@@ -1153,6 +1275,7 @@ function normalizeState(s) {
   if (!s || typeof s !== 'object') return merged;
   if (Array.isArray(s.trades)) merged.trades = s.trades;
   if (Array.isArray(s.portfolio)) merged.portfolio = s.portfolio;
+  if (Array.isArray(s.coreClosed)) merged.coreClosed = s.coreClosed;
   if (Array.isArray(s.priority)) merged.priority = s.priority;
   if (Array.isArray(s.watchlists) && s.watchlists.length) merged.watchlists = s.watchlists;
   if (Array.isArray(s.strategies)) merged.strategies = s.strategies;
@@ -1486,7 +1609,9 @@ function setupAutoRefresh() {
    STATS COMPUTATION
    ======================================================================== */
 function computeStats() {
-  const closed = state.trades.filter(t => t.status === 'closed');
+  const satelliteClosed = state.trades.filter(t => t.status === 'closed');
+  const coreClosed = (state.coreClosed || []);
+  const closed = [...satelliteClosed, ...coreClosed];  // combined for analytics
   const open = state.trades.filter(t => t.status === 'open');
   const totalRealized = closed.reduce((s, t) => s + (Number(t.realizedPnl) || 0), 0);
   const wins = closed.filter(t => (Number(t.realizedPnl) || 0) > 0);
@@ -1495,7 +1620,7 @@ function computeStats() {
   const best = closed.reduce((b, t) => (Number(t.realizedPnl) || 0) > (Number(b?.realizedPnl) || -Infinity) ? t : b, null);
   const worst = closed.reduce((w, t) => (Number(t.realizedPnl) || 0) < (Number(w?.realizedPnl) || Infinity) ? t : w, null);
   const avgPnl = closed.length ? totalRealized / closed.length : 0;
-  return { closed, open, totalRealized, winRate, wins, losses, best, worst, avgPnl };
+  return { closed, satelliteClosed, open, totalRealized, winRate, wins, losses, best, worst, avgPnl };
 }
 
 /* ========================================================================
@@ -1602,6 +1727,7 @@ function renderTrades() {
       <button class="sub-tab-btn ${activeSubTab.trades === 'satellite-open' ? 'active' : ''}" onclick="setSubTab('trades','satellite-open')">Satellite Open</button>
       <button class="sub-tab-btn ${activeSubTab.trades === 'satellite-closed' ? 'active' : ''}" onclick="setSubTab('trades','satellite-closed')">Satellite Closed</button>
       <button class="sub-tab-btn ${activeSubTab.trades === 'core' ? 'active' : ''}" onclick="setSubTab('trades','core')">Core Holdings</button>
+      <button class="sub-tab-btn ${activeSubTab.trades === 'core-closed' ? 'active' : ''}" onclick="setSubTab('trades','core-closed')">Core Closed</button>
     </div>
 
     <div id="tradesContent"></div>
@@ -1620,6 +1746,10 @@ function renderTradesContent(tags) {
   const container = document.getElementById('tradesContent');
   if (activeSubTab.trades === 'core') {
     container.innerHTML = renderCorePortfolio();
+    return;
+  }
+  if (activeSubTab.trades === 'core-closed') {
+    container.innerHTML = renderCoreClosedList();
     return;
   }
   const status = activeSubTab.trades === 'satellite-open' ? 'open' : 'closed';
@@ -1769,6 +1899,7 @@ function renderCorePortfolio() {
           <div><div class="trade-field-label">Current</div><div class="trade-field-value">${formatINR(current)}</div></div>
         </div>
         <div class="trade-actions">
+          <button class="btn btn-success btn-sm" onclick="openCloseCoreModal('${p.id}')">Sell / Close</button>
           <button class="btn btn-ghost btn-sm" onclick="openEditPortfolioModal('${p.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deletePortfolioPrompt('${p.id}')">Delete</button>
         </div>
@@ -1788,6 +1919,209 @@ function renderCorePortfolio() {
     </div>
     ${rows}
   `;
+}
+
+/* ========================================================================
+   CORE CLOSED LIST + CLOSE CORE HOLDING
+   ======================================================================== */
+function renderCoreClosedList() {
+  const items = (state.coreClosed || []).slice().sort((a, b) => new Date(b.closedAt || 0) - new Date(a.closedAt || 0));
+  if (!items.length) {
+    return `<div class="empty-state">
+      <div class="empty-state-icon">📦</div>
+      <div class="empty-state-title">No closed core holdings</div>
+      <div class="empty-state-desc">Sold long-term holdings will appear here.</div>
+    </div>`;
+  }
+  const totalPnl = items.reduce((s, i) => s + (Number(i.realizedPnl) || 0), 0);
+  return `
+    <div class="stat-grid" style="margin-bottom: 12px;">
+      <div class="stat-card"><div class="stat-label">Closed Records</div><div class="stat-value">${items.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Realized P&L</div><div class="stat-value ${pnlClass(totalPnl)}">${formatPnl(totalPnl)}</div></div>
+    </div>
+    ${items.map(item => `
+      <div class="trade-card animate-fade-up">
+        <div class="trade-header">
+          <div>
+            <div class="trade-symbol">${escapeHtml(item.symbol)}</div>
+            ${item.tradeName ? `<div class="trade-name">${escapeHtml(item.tradeName)}</div>` : ''}
+          </div>
+          <div class="trade-badges">
+            <span class="badge">CORE</span>
+            <span class="badge success">SOLD</span>
+            <span class="badge ${(Number(item.realizedPnl)||0) >= 0 ? 'success' : 'error'}">${formatPnl(item.realizedPnl)}</span>
+          </div>
+        </div>
+        <div class="trade-grid">
+          <div><div class="trade-field-label">Avg Buy</div><div class="trade-field-value">${formatINR(item.entryPrice)}</div></div>
+          <div><div class="trade-field-label">Sell Price</div><div class="trade-field-value">${formatINR(item.exitPrice)}</div></div>
+          <div><div class="trade-field-label">Qty Sold</div><div class="trade-field-value">${escapeHtml(item.exitQty)}</div></div>
+          <div><div class="trade-field-label">Buy Date</div><div class="trade-field-value">${formatDate(item.entryDate, { day:'2-digit', month:'short', year:'2-digit' })}</div></div>
+          <div><div class="trade-field-label">Sell Date</div><div class="trade-field-value">${formatDate(item.closedAt, { day:'2-digit', month:'short', year:'2-digit' })}</div></div>
+          <div><div class="trade-field-label">Category</div><div class="trade-field-value">${escapeHtml(item.category || 'Stocks')}</div></div>
+        </div>
+        ${item.exitDesc ? `<div class="trade-desc"><strong style="color: var(--text); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">Exit Notes:</strong>\n${escapeHtml(item.exitDesc)}</div>` : ''}
+        ${item.exitChart ? `<div class="trade-charts"><img class="trade-chart-thumb" src="${item.exitChart}" alt="Exit Chart" onclick="openCoreLightbox('${item.id}')"></div>` : ''}
+        <div class="trade-actions">
+          <button class="btn btn-danger btn-sm" onclick="deleteCoreClosed('${item.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function openCloseCoreModal(id) {
+  const p = state.portfolio.find(x => x.id === id);
+  if (!p) return;
+  let exitChartData = null;
+
+  showModal({
+    title: `Sell / Close: ${p.symbol}`,
+    body: `
+      <p style="color: var(--text-muted); font-size: 12px; margin: 0 0 12px;">
+        Avg Buy: <strong class="mono">${formatINR(p.avgPrice)}</strong> &nbsp;·&nbsp;
+        Holding: <strong class="mono">${escapeHtml(p.qty)}</strong> shares
+      </p>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Sell Price ₹ *</label>
+          <input class="form-input mono" id="cc-exitPrice" type="number" step="0.01" placeholder="0.00" value="${window.livePrices[p.symbol] ? window.livePrices[p.symbol].price.toFixed(2) : ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Qty to Sell * (max ${escapeHtml(p.qty)})</label>
+          <input class="form-input mono" id="cc-sellQty" type="number" step="1" min="1" max="${escapeHtml(p.qty)}" value="${escapeHtml(p.qty)}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sell Date &amp; Time</label>
+        <input class="form-input mono" id="cc-exitDate" type="datetime-local" value="${nowDatetimeLocal()}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">P&amp;L (auto-calculated, or override)</label>
+        <input class="form-input mono" id="cc-pnl" type="number" step="0.01" placeholder="Auto">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Exit Notes</label>
+        <textarea class="form-textarea" id="cc-exitNotes" rows="2" placeholder="Reason for selling, observations..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">After-close Chart</label>
+        <div class="drop-zone" id="ccDropZone">
+          <div style="text-align:center; color: var(--text-muted);">
+            <div style="font-size: 24px; margin-bottom: 4px;">📷</div>
+            <div style="font-size: 13px;">Drop image or click to upload</div>
+          </div>
+          <input type="file" id="ccChartInput" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
+        </div>
+        <div id="ccChartPreview" style="margin-top: 8px;"></div>
+      </div>
+    `,
+    footer: `
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-success" id="confirmCloseCoreBtn">Confirm Sale</button>
+    `
+  });
+
+  // Auto-calc P&L when price or qty changes
+  const calcPnl = () => {
+    const ep = parseFloat(document.getElementById('cc-exitPrice').value);
+    const sq = parseInt(document.getElementById('cc-sellQty').value);
+    const pnlField = document.getElementById('cc-pnl');
+    if (!isNaN(ep) && !isNaN(sq) && !pnlField.dataset.manual) {
+      pnlField.value = ((ep - Number(p.avgPrice)) * sq).toFixed(2);
+    }
+  };
+  document.getElementById('cc-exitPrice').oninput = calcPnl;
+  document.getElementById('cc-sellQty').oninput = () => {
+    const sq = parseInt(document.getElementById('cc-sellQty').value);
+    if (!isNaN(sq) && sq > Number(p.qty)) document.getElementById('cc-sellQty').value = p.qty;
+    calcPnl();
+  };
+  document.getElementById('cc-pnl').oninput = (e) => {
+    e.target.dataset.manual = e.target.value ? '1' : '';
+  };
+
+  // Chart upload
+  const dropZone = document.getElementById('ccDropZone');
+  const chartInput = document.getElementById('ccChartInput');
+  const setupChart = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    exitChartData = await readFileAsBase64(file);
+    document.getElementById('ccChartPreview').innerHTML = `<img src="${exitChartData}" style="width:100%; border-radius:8px; max-height:180px; object-fit:cover;">`;
+  };
+  chartInput.onchange = (e) => { if (e.target.files[0]) setupChart(e.target.files[0]); };
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
+  dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+  dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = ''; if (e.dataTransfer.files[0]) setupChart(e.dataTransfer.files[0]); });
+
+  document.getElementById('confirmCloseCoreBtn').onclick = async () => {
+    const exitPrice = parseFloat(document.getElementById('cc-exitPrice').value);
+    const sellQty = parseInt(document.getElementById('cc-sellQty').value);
+    if (isNaN(exitPrice) || exitPrice <= 0) return showToast('Enter a valid sell price', 'error');
+    if (isNaN(sellQty) || sellQty <= 0 || sellQty > Number(p.qty)) return showToast(`Enter a valid qty (1–${p.qty})`, 'error');
+    const exitDate = document.getElementById('cc-exitDate').value;
+    const exitNotes = document.getElementById('cc-exitNotes').value.trim();
+    let realizedPnl = parseFloat(document.getElementById('cc-pnl').value);
+    if (isNaN(realizedPnl)) realizedPnl = (exitPrice - Number(p.avgPrice)) * sellQty;
+
+    // Create core-closed record
+    const record = {
+      id: generateId(),
+      portfolioType: 'core',
+      symbol: p.symbol,
+      category: p.category || 'stocks',
+      tradeName: p.tradeName || '',
+      entryPrice: p.avgPrice,
+      entryDate: p.dateAdded || null,
+      exitPrice: exitPrice,
+      exitQty: sellQty,
+      exitDesc: exitNotes,
+      exitChart: exitChartData,
+      realizedPnl: realizedPnl,
+      closedAt: exitDate ? new Date(exitDate).toISOString() : new Date().toISOString(),
+      status: 'closed'
+    };
+    if (!Array.isArray(state.coreClosed)) state.coreClosed = [];
+    state.coreClosed.push(record);
+
+    // Update or remove holding
+    const remaining = Number(p.qty) - sellQty;
+    if (remaining <= 0) {
+      state.portfolio = state.portfolio.filter(x => x.id !== id);
+      showToast(`${p.symbol} fully sold — ${formatPnl(realizedPnl)}`, realizedPnl >= 0 ? 'success' : 'warning', 4000);
+    } else {
+      p.qty = remaining;
+      showToast(`${p.symbol} partial sell ${sellQty} shares — ${formatPnl(realizedPnl)}`, realizedPnl >= 0 ? 'success' : 'warning', 4000);
+    }
+
+    await saveState();
+    closeModal();
+    setSubTab('trades', 'core');
+  };
+}
+
+function deleteCoreClosed(id) {
+  showModal({
+    title: 'Delete Record',
+    body: '<p style="color: var(--text-muted);">Delete this closed core holding record? This cannot be undone.</p>',
+    footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-danger" id="delCoreCBtn">Delete</button>`
+  });
+  document.getElementById('delCoreCBtn').onclick = async () => {
+    state.coreClosed = (state.coreClosed || []).filter(x => x.id !== id);
+    await saveState();
+    closeModal();
+    setSubTab('trades', 'core-closed');
+    showToast('Record deleted', 'info');
+  };
+}
+
+function openCoreLightbox(id) {
+  const item = (state.coreClosed || []).find(x => x.id === id);
+  if (!item || !item.exitChart) return;
+  showModal({
+    title: `${item.symbol} — Exit Chart`,
+    body: `<img src="${item.exitChart}" style="width:100%; border-radius: 8px; max-height: 70vh; object-fit: contain;">`
+  });
 }
 
 /* ========================================================================
@@ -2544,9 +2878,13 @@ function renderCalendar() {
   const daysInMonth = lastDay.getDate();
   const today = new Date();
 
-  // Build day-keyed P&L map for this month
+  // Build day-keyed P&L map for this month (satellite closed + core closed)
   const dayMap = {};
-  state.trades.filter(t => t.status === 'closed' && t.closedAt).forEach(t => {
+  const allClosed = [
+    ...state.trades.filter(t => t.status === 'closed' && t.closedAt),
+    ...(state.coreClosed || []).filter(t => t.closedAt)
+  ];
+  allClosed.forEach(t => {
     const d = new Date(t.closedAt);
     if (d.getFullYear() === year && d.getMonth() === month) {
       const pnl = Number(t.realizedPnl) || 0;
@@ -2675,13 +3013,17 @@ function renderAnalytics() {
 function renderMonthlyRows() {
   const now = new Date();
   const rows = [];
+  const allClosedRecords = [
+    ...state.trades.filter(t => t.status === 'closed' && t.closedAt),
+    ...(state.coreClosed || []).filter(t => t.closedAt)
+  ];
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const year = d.getFullYear(), month = d.getMonth();
-    const trades = state.trades.filter(t => t.status === 'closed' && t.closedAt && (() => {
+    const trades = allClosedRecords.filter(t => {
       const cd = new Date(t.closedAt);
       return cd.getFullYear() === year && cd.getMonth() === month;
-    })());
+    });
     const total = trades.reduce((s, t) => s + (Number(t.realizedPnl) || 0), 0);
     const wins = trades.filter(t => (Number(t.realizedPnl) || 0) > 0).length;
     const losses = trades.filter(t => (Number(t.realizedPnl) || 0) < 0).length;
@@ -2721,7 +3063,10 @@ function renderCategoryRows() {
 function drawEquityCurve() {
   const canvas = document.getElementById('equityCanvas');
   if (!canvas) return;
-  const closed = state.trades.filter(t => t.status === 'closed' && t.closedAt).sort((a, b) => new Date(a.closedAt) - new Date(b.closedAt));
+  const closed = [
+    ...state.trades.filter(t => t.status === 'closed' && t.closedAt),
+    ...(state.coreClosed || []).filter(t => t.closedAt)
+  ].sort((a, b) => new Date(a.closedAt) - new Date(b.closedAt));
   if (!closed.length) {
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.offsetWidth * (window.devicePixelRatio || 1);
@@ -3004,6 +3349,67 @@ function renderSettings() {
       </div>
     </div>
 
+    <!-- APPEARANCE -->
+    <div class="section-panel">
+      <h3 class="section-panel-title">🎨 Appearance</h3>
+      <p class="section-panel-desc">Theme, font style, and font size preferences.</p>
+
+      <!-- Theme -->
+      <div class="form-group">
+        <label class="form-label">Theme</label>
+        <div class="toggle-group">
+          <button class="toggle-btn ${(state.settings.theme || 'dark') === 'dark' ? 'active' : ''}" onclick="setTheme('dark')">🌙 Dark</button>
+          <button class="toggle-btn ${(state.settings.theme || 'dark') === 'light' ? 'active' : ''}" onclick="setTheme('light')">☀️ Light</button>
+        </div>
+      </div>
+
+      <!-- Text Font -->
+      <div class="form-group">
+        <label class="form-label">Text Font</label>
+        <select class="form-input" id="textFontSel" onchange="setTextFont(this.value)">
+          ${['Inter','Roboto','Poppins','Lato','Open Sans','Nunito'].map(f => `<option value="${f}" ${(state.settings.textFont||'Inter')===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <div class="font-preview-text" id="textFontPreview" style="font-family:'${state.settings.textFont||'Inter'}',sans-serif; font-size:${state.settings.textSize||14}px;">
+          The quick brown fox jumps over the lazy dog. Naz Trades Journal.
+        </div>
+      </div>
+
+      <!-- Text Size -->
+      <div class="form-group">
+        <label class="form-label">Text Size</label>
+        <div class="font-slider-wrap">
+          <span style="color: var(--text-subtle); font-size: 11px;">12px</span>
+          <input type="range" class="font-slider" id="textSizeSlider" min="12" max="18" step="1" value="${state.settings.textSize||14}"
+            oninput="setTextSize(this.value)">
+          <span style="color: var(--text-subtle); font-size: 11px;">18px</span>
+          <span class="slider-val" id="textSizeVal">${state.settings.textSize||14}px</span>
+        </div>
+      </div>
+
+      <!-- Number Font -->
+      <div class="form-group">
+        <label class="form-label">Number / Mono Font</label>
+        <select class="form-input" id="numFontSel" onchange="setNumFont(this.value)">
+          ${['JetBrains Mono','Space Mono','IBM Plex Mono','Fira Code','Courier New'].map(f => `<option value="${f}" ${(state.settings.numFont||'JetBrains Mono')===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <div class="font-preview-num" id="numFontPreview" style="font-family:'${state.settings.numFont||'JetBrains Mono'}',monospace; font-size:${state.settings.numSize||13}px;">
+          ₹1,23,456.78 · +₹4,567 · -₹890.50 · 12:01:32 IST
+        </div>
+      </div>
+
+      <!-- Number Size -->
+      <div class="form-group">
+        <label class="form-label">Number Font Size</label>
+        <div class="font-slider-wrap">
+          <span style="color: var(--text-subtle); font-size: 11px;">11px</span>
+          <input type="range" class="font-slider" id="numSizeSlider" min="11" max="16" step="1" value="${state.settings.numSize||13}"
+            oninput="setNumSize(this.value)">
+          <span style="color: var(--text-subtle); font-size: 11px;">16px</span>
+          <span class="slider-val" id="numSizeVal">${state.settings.numSize||13}px</span>
+        </div>
+      </div>
+    </div>
+
     <!-- ABOUT -->
     <div class="section-panel">
       <h3 class="section-panel-title">ℹ About</h3>
@@ -3015,6 +3421,86 @@ function renderSettings() {
       </p>
     </div>
   `;
+}
+
+/* ========================================================================
+   THEME & FONT
+   ======================================================================== */
+function applyTheme(theme) {
+  const isDark = (theme || state.settings.theme || 'dark') === 'dark';
+  document.documentElement.classList.toggle('light', !isDark);
+  // Swap sun/moon icons
+  const sun = document.getElementById('iconSun');
+  const moon = document.getElementById('iconMoon');
+  if (sun) sun.style.display = isDark ? 'block' : 'none';
+  if (moon) moon.style.display = isDark ? 'none' : 'block';
+  // Update meta theme-color
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#f1f5f9');
+}
+
+function toggleTheme() {
+  const cur = state.settings.theme || 'dark';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  state.settings.theme = next;
+  applyTheme(next);
+  saveState();
+}
+
+function setTheme(t) {
+  state.settings.theme = t;
+  applyTheme(t);
+  saveState();
+  renderSettings();
+}
+
+function applyFonts() {
+  const s = state.settings;
+  const textFont = s.textFont || 'Inter';
+  const textSize = s.textSize || 14;
+  const numFont = s.numFont || 'JetBrains Mono';
+  const numSize = s.numSize || 13;
+  document.documentElement.style.setProperty('--font-sans', `'${textFont}', ui-sans-serif, system-ui, sans-serif`);
+  document.documentElement.style.setProperty('--font-mono', `'${numFont}', ui-monospace, Menlo, Consolas, monospace`);
+  document.body.style.fontSize = textSize + 'px';
+}
+
+function setTextFont(f) {
+  state.settings.textFont = f;
+  applyFonts();
+  saveState();
+  const preview = document.getElementById('textFontPreview');
+  if (preview) preview.style.fontFamily = `'${f}', sans-serif`;
+}
+
+function setTextSize(v) {
+  const n = parseInt(v);
+  state.settings.textSize = n;
+  applyFonts();
+  saveState();
+  const lbl = document.getElementById('textSizeVal');
+  if (lbl) lbl.textContent = n + 'px';
+  const preview = document.getElementById('textFontPreview');
+  if (preview) preview.style.fontSize = n + 'px';
+}
+
+function setNumFont(f) {
+  state.settings.numFont = f;
+  applyFonts();
+  saveState();
+  const preview = document.getElementById('numFontPreview');
+  if (preview) preview.style.fontFamily = `'${f}', monospace`;
+}
+
+function setNumSize(v) {
+  const n = parseInt(v);
+  state.settings.numSize = n;
+  applyFonts();
+  saveState();
+  const lbl = document.getElementById('numSizeVal');
+  if (lbl) lbl.textContent = n + 'px';
+  const preview = document.getElementById('numFontPreview');
+  if (preview) preview.style.fontSize = n + 'px';
 }
 
 function setExchange(ex) {
@@ -3176,6 +3662,22 @@ function exportXlsx() {
     'Updated At': s.updatedAt ? new Date(s.updatedAt).toLocaleString('en-IN') : ''
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stratRows.length ? stratRows : [{ '#': '', 'Title': '' }]), 'Strategies');
+
+  // Sheet 6: Core Closed
+  const coreClosedRows = (state.coreClosed || []).map((t, i) => ({
+    '#': i + 1,
+    'Symbol': t.symbol,
+    'Category': t.category || '',
+    'Trade Name': t.tradeName || '',
+    'Avg Buy ₹': t.entryPrice,
+    'Sell Price ₹': t.exitPrice,
+    'Qty Sold': t.exitQty,
+    'Realized P&L ₹': t.realizedPnl ?? '',
+    'Buy Date': t.entryDate ? new Date(t.entryDate).toLocaleString('en-IN') : '',
+    'Sell Date': t.closedAt ? new Date(t.closedAt).toLocaleString('en-IN') : '',
+    'Exit Notes': t.exitDesc || ''
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(coreClosedRows.length ? coreClosedRows : [{ '#': '', 'Symbol': '' }]), 'Core Closed');
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([wbout], { type: 'application/octet-stream' });
@@ -3527,6 +4029,8 @@ function doSearch(query) {
    ======================================================================== */
 async function init() {
   await loadState();
+  applyTheme();
+  applyFonts();
   renderTabs();
   switchTab('dashboard');
   updateMarketStatus();
@@ -3534,6 +4038,7 @@ async function init() {
   setupAutoRefresh();
   document.getElementById('searchBtn').onclick = openSearchModal;
   document.getElementById('quickAddBtn').onclick = () => switchTab('entry');
+  document.getElementById('themeToggleBtn').onclick = toggleTheme;
   // Keyboard shortcut: Cmd/Ctrl+K
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
