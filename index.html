@@ -6,8 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
-<meta name="description" content="Arthveda Journal — offline trading journal for Indian traders">
-<title>Arthveda Journal</title>
+<meta name="apple-mobile-web-app-title" content="Naz Trades">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%23000' width='32' height='32' rx='4'/><text x='50%' y='50%' font-size='14' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>NT</text></svg>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%23000' width='180' height='180' rx='40'/><text x='90' y='90' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>NT</text></svg>"  type="image/svg+xml">
+<meta name="description" content="Naz Trades — offline trading journal for Indian traders">
+<title>Naz Trades</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -112,14 +115,17 @@ body {
 .brand-logo {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+  border-radius: 4px;
+  background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 10px;
+  border: 1px solid #fff;
+  padding: 0;
+  position: relative;
 }
 .tabs-bar {
   display: flex;
@@ -973,8 +979,8 @@ table.data-table tr:last-child td { border-bottom: none; }
 <header class="header">
   <div class="header-inner">
     <div class="brand">
-      <div class="brand-logo">A</div>
-      <span>Arthveda Journal</span>
+      <div class="brand-logo">NT</div>
+      <span>Naz Trades</span>
     </div>
     <div class="tabs-bar" id="tabsBar"></div>
     <div class="header-actions">
@@ -1075,7 +1081,7 @@ let refreshTimer = null;
 /* ========================================================================
    INDEXEDDB STORAGE
    ======================================================================== */
-const DB_NAME = 'arthveda_journal';
+const DB_NAME = 'naz_trades';
 const STORE = 'app_state';
 let dbInstance = null;
 
@@ -1102,7 +1108,7 @@ async function saveState() {
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    try { localStorage.setItem('arthveda_state', JSON.stringify(state)); }
+    try { localStorage.setItem('naz_trades_state', JSON.stringify(state)); }
     catch (err) { console.error('Storage failed:', err); }
   }
 }
@@ -1119,7 +1125,7 @@ async function loadState() {
         } else {
           // Try localStorage fallback
           try {
-            const raw = localStorage.getItem('arthveda_state');
+            const raw = localStorage.getItem('naz_trades_state');
             if (raw) state = normalizeState(JSON.parse(raw));
           } catch (e) {}
         }
@@ -1129,7 +1135,7 @@ async function loadState() {
     });
   } catch (e) {
     try {
-      const raw = localStorage.getItem('arthveda_state');
+      const raw = localStorage.getItem('naz_trades_state');
       if (raw) state = normalizeState(JSON.parse(raw));
     } catch (err) {}
   }
@@ -2995,8 +3001,9 @@ function renderSettings() {
     <div class="section-panel">
       <h3 class="section-panel-title">ℹ About</h3>
       <p style="margin: 0; font-size: 12px; color: var(--text-muted);">
-        <strong>Arthveda Journal</strong> v2 · Offline trading journal for Indian traders<br>
+        <strong>Naz Trades</strong> · Offline trading journal for Indian traders<br>
         Nothing sent to any server. Data stored locally in your browser (IndexedDB).<br>
+        Track. Analyze. Optimize. Succeed.<br>
         Designed for Zerodha, Groww, Angel One &amp; other Indian brokers.
       </p>
     </div>
@@ -3029,11 +3036,11 @@ function downloadJsonBackup() {
   const payload = {
     _version: 2,
     _exportedAt: new Date().toISOString(),
-    _app: 'Arthveda Journal',
+    _app: 'Naz Trades',
     ...state
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  downloadBlob(blob, `arthveda_backup_${todayDateStr()}.json`);
+  downloadBlob(blob, `naz_trades_backup_${todayDateStr()}.json`);
   showToast('Backup downloaded', 'success');
 }
 
@@ -3165,7 +3172,7 @@ function exportXlsx() {
 
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([wbout], { type: 'application/octet-stream' });
-  downloadBlob(blob, `arthveda_export_${todayDateStr()}.xlsx`);
+  downloadBlob(blob, `naz_trades_export_${todayDateStr()}.xlsx`);
   showToast('XLSX exported', 'success');
 }
 
@@ -3187,7 +3194,7 @@ function exportCsv() {
   ].map(escapeCsv).join(','));
   const csv = cols.join(',') + '\n' + rows.join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  downloadBlob(blob, `arthveda_trades_${todayDateStr()}.csv`);
+  downloadBlob(blob, `naz_trades_${todayDateStr()}.csv`);
   showToast('CSV exported', 'success');
 }
 
