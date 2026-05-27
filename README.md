@@ -1,6 +1,8 @@
-# Arthveda Journal
+# Naz Trades
 
 Offline trading journal for Indian traders. Single-file HTML app with full backup/restore, dual portfolio, live NSE/BSE prices, and analytics.
+
+**Track. Analyze. Optimize. Succeed.**
 
 ## Quick start
 
