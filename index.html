@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
 <meta name="apple-mobile-web-app-title" content="Naz Trades">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='3' width='20' height='26' rx='2' fill='%23000' stroke='%23fff' stroke-width='1'/><circle cx='6.5' cy='6' r='1' fill='%23fff'/><circle cx='6.5' cy='10' r='1' fill='%23fff'/><circle cx='6.5' cy='14' r='1' fill='%23fff'/><circle cx='6.5' cy='18' r='1' fill='%23fff'/><circle cx='6.5' cy='22' r='1' fill='%23fff'/><text x='14' y='13' font-size='7' font-weight='bold' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Trading</text><text x='14' y='19' font-size='6' font-weight='600' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Journal</text></svg>" type="image/svg+xml">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect x='30' y='20' width='120' height='140' rx='10' fill='%23000' stroke='%23fff' stroke-width='3'/><circle cx='45' cy='35' r='6' fill='%23fff'/><circle cx='45' cy='60' r='6' fill='%23fff'/><circle cx='45' cy='85' r='6' fill='%23fff'/><circle cx='45' cy='110' r='6' fill='%23fff'/><circle cx='45' cy='135' r='6' fill='%23fff'/><text x='90' y='75' font-size='32' font-weight='bold' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Trading</text><text x='90' y='110' font-size='28' font-weight='600' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Journal</text></svg>" type="image/svg+xml">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect x='6' y='4' width='28' height='40' rx='3' fill='%23000' stroke='%23fff' stroke-width='2'/><circle cx='10' cy='9' r='1.5' fill='%23fff'/><circle cx='10' cy='15' r='1.5' fill='%23fff'/><circle cx='10' cy='21' r='1.5' fill='%23fff'/><circle cx='10' cy='27' r='1.5' fill='%23fff'/><circle cx='10' cy='33' r='1.5' fill='%23fff'/><circle cx='10' cy='39' r='1.5' fill='%23fff'/><text x='20' y='18' font-size='9' font-weight='bold' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial,sans-serif'>Trading</text><text x='20' y='28' font-size='8' font-weight='600' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial,sans-serif'>Journal</text></svg>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect x='24' y='16' width='144' height='160' rx='12' fill='%23000' stroke='%23fff' stroke-width='4'/><circle cx='42' cy='34' r='8' fill='%23fff'/><circle cx='42' cy='66' r='8' fill='%23fff'/><circle cx='42' cy='98' r='8' fill='%23fff'/><circle cx='42' cy='130' r='8' fill='%23fff'/><circle cx='42' cy='162' r='8' fill='%23fff'/><text x='96' y='80' font-size='40' font-weight='bold' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial,sans-serif' letter-spacing='-0.5px'>Trading</text><text x='96' y='125' font-size='36' font-weight='600' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial,sans-serif' letter-spacing='-0.5px'>Journal</text></svg>" type="image/svg+xml">
 <meta name="description" content="Naz Trades — offline trading journal for Indian traders">
 <title>Naz Trades</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -113,12 +113,16 @@ body {
   letter-spacing: -0.01em;
 }
 .brand-logo {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: #000;
+  border-radius: 6px;
+  padding: 0;
+  border: 2px solid #fff;
 }
 .tabs-bar {
   display: flex;
@@ -973,18 +977,19 @@ table.data-table tr:last-child td { border-bottom: none; }
   <div class="header-inner">
     <div class="brand">
       <div class="brand-logo">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Black notebook cover -->
-          <rect x="4" y="3" width="20" height="26" rx="2" fill="#000" stroke="#fff" stroke-width="1"/>
+          <rect x="6" y="4" width="28" height="40" rx="3" fill="#000" stroke="#fff" stroke-width="2"/>
           <!-- Spiral binding -->
-          <circle cx="6.5" cy="6" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="10" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="14" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="18" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="22" r="1" fill="#fff"/>
+          <circle cx="10" cy="9" r="1.5" fill="#fff"/>
+          <circle cx="10" cy="15" r="1.5" fill="#fff"/>
+          <circle cx="10" cy="21" r="1.5" fill="#fff"/>
+          <circle cx="10" cy="27" r="1.5" fill="#fff"/>
+          <circle cx="10" cy="33" r="1.5" fill="#fff"/>
+          <circle cx="10" cy="39" r="1.5" fill="#fff"/>
           <!-- White text on black -->
-          <text x="14" y="13" font-size="7" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="middle">Trading</text>
-          <text x="14" y="19" font-size="6" font-weight="600" fill="#fff" text-anchor="middle" dominant-baseline="middle">Journal</text>
+          <text x="20" y="18" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif">Trading</text>
+          <text x="20" y="28" font-size="8" font-weight="600" fill="#fff" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif">Journal</text>
         </svg>
       </div>
       <span>Naz Trades</span>
