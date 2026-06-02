@@ -2401,6 +2401,9 @@ function openCloseTradeModal(tradeId) {
 function openEditTradeModal(tradeId) {
   const t = state.trades.find(x => x.id === tradeId);
   if (!t) return;
+  let newEntryChart = t.entryChart || null;
+  let newExitChart = t.exitChart || null;
+
   showModal({
     title: `Edit Trade: ${t.symbol}`,
     body: `
@@ -2414,12 +2417,77 @@ function openEditTradeModal(tradeId) {
         <div class="form-group"><label class="form-label">Entry Date</label><input class="form-input mono" id="et-date" type="datetime-local" value="${(t.entryDate || '').slice(0,16)}"></div>
       </div>
       <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="et-desc" rows="3">${escapeHtml(t.entryDesc || '')}</textarea></div>
+      <div class="form-group">
+        <label class="form-label">Before Chart (Entry)</label>
+        <div id="et-entry-container"></div>
+        <input type="file" id="et-entry-input" accept="image/*" style="display:none;">
+      </div>
+      ${t.status === 'closed' ? `
+      <div class="form-group">
+        <label class="form-label">After Chart (Exit)</label>
+        <div id="et-exit-container"></div>
+        <input type="file" id="et-exit-input" accept="image/*" style="display:none;">
+      </div>` : ''}
     `,
     footer: `
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn" id="saveEditBtn">Save</button>
     `
   });
+
+  function renderEditChart(which) {
+    const src = which === 'entry' ? newEntryChart : newExitChart;
+    const container = document.getElementById(`et-${which}-container`);
+    if (!container) return;
+    if (src) {
+      container.innerHTML = `
+        <img src="${src}" style="width:100%; max-height:160px; object-fit:cover; border-radius:8px; cursor:pointer; display:block;" id="et-${which}-thumb">
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-secondary" style="flex:1; font-size:12px; padding:6px 10px;" id="et-${which}-replace">⬆ Replace</button>
+          <button class="btn btn-secondary" style="font-size:12px; padding:6px 10px; color:var(--error); border-color:var(--error);" id="et-${which}-delete">✕ Delete</button>
+        </div>`;
+      document.getElementById(`et-${which}-thumb`).onclick = () => openImageLightbox(which === 'entry' ? newEntryChart : newExitChart);
+      document.getElementById(`et-${which}-replace`).onclick = () => document.getElementById(`et-${which}-input`).click();
+      document.getElementById(`et-${which}-delete`).onclick = () => {
+        if (which === 'entry') newEntryChart = null; else newExitChart = null;
+        renderEditChart(which);
+      };
+    } else {
+      container.innerHTML = `
+        <div class="drop-zone" id="et-${which}-zone">
+          <div><div style="font-size:24px; opacity:0.4;">📊</div><div style="margin-top:4px; font-size:13px; color:var(--text-muted);">Click or drag to add chart image</div></div>
+        </div>`;
+      const zone = document.getElementById(`et-${which}-zone`);
+      zone.onclick = () => document.getElementById(`et-${which}-input`).click();
+      zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
+      zone.ondragleave = () => zone.classList.remove('dragover');
+      zone.ondrop = async (e) => {
+        e.preventDefault(); zone.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+          const b64 = await readFileAsBase64(file);
+          if (which === 'entry') newEntryChart = b64; else newExitChart = b64;
+          renderEditChart(which);
+        }
+      };
+    }
+    const input = document.getElementById(`et-${which}-input`);
+    if (input) {
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+          const b64 = await readFileAsBase64(file);
+          if (which === 'entry') newEntryChart = b64; else newExitChart = b64;
+          renderEditChart(which);
+          e.target.value = '';
+        }
+      };
+    }
+  }
+
+  renderEditChart('entry');
+  if (t.status === 'closed') renderEditChart('exit');
+
   document.getElementById('saveEditBtn').onclick = async () => {
     t.symbol = (document.getElementById('et-symbol').value || '').toUpperCase().trim();
     t.tradeName = document.getElementById('et-name').value.trim();
@@ -2428,6 +2496,8 @@ function openEditTradeModal(tradeId) {
     const dt = document.getElementById('et-date').value;
     if (dt) t.entryDate = new Date(dt).toISOString();
     t.entryDesc = document.getElementById('et-desc').value;
+    t.entryChart = newEntryChart;
+    if (t.status === 'closed') t.exitChart = newExitChart;
     await saveState();
     closeModal();
     showToast('Trade updated', 'success');
