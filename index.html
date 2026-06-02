@@ -1280,14 +1280,47 @@ async function loadState() {
 function normalizeState(s) {
   const merged = JSON.parse(JSON.stringify(DEFAULT_STATE));
   if (!s || typeof s !== 'object') return merged;
-  if (Array.isArray(s.trades)) merged.trades = s.trades;
+
+  // Handle MyTrades nested format: trades = { live: {stocks,futures,options}, closed: {stocks,futures,options} }
+  if (s.trades && !Array.isArray(s.trades) && (s.trades.live || s.trades.closed)) {
+    const catMap = { stocks: 'stocks', futures: 'futures', options: 'options' };
+    const convertMyTrade = (mt, status) => ({
+      id: mt.id || generateId(),
+      portfolioType: 'satellite',
+      status,
+      category: catMap[mt.cat] || 'stocks',
+      symbol: (mt.before && mt.before.symbol) || (mt.after && mt.after.symbol) || '',
+      tradeName: (mt.before && mt.before.name) || '',
+      entryPrice: mt.before ? Number(mt.before.price) || 0 : 0,
+      entryQty: mt.before ? Number(mt.before.qty) || 0 : 0,
+      entryDate: (mt.before && mt.before.datetime) || mt.addedAt || new Date().toISOString(),
+      entryDesc: (mt.before && mt.before.description) || '',
+      entryChart: (mt.before && mt.before.image) || null,
+      exitPrice: mt.after ? Number(mt.after.price) || null : null,
+      exitQty: mt.after ? Number(mt.after.qty) || null : null,
+      exitDate: (mt.after && mt.after.datetime) || mt.closedAt || null,
+      exitDesc: (mt.after && mt.after.description) || '',
+      exitChart: (mt.after && mt.after.image) || null,
+      realizedPnl: mt.after ? Number(mt.after.pl) || null : null,
+      closedAt: mt.closedAt || null,
+      tags: Array.isArray(mt.tags) ? mt.tags : ['mytrades-import'],
+      createdAt: mt.createdAt || new Date().toISOString()
+    });
+    const live = s.trades.live || {};
+    const closed = s.trades.closed || {};
+    const liveTrades = [...(live.stocks||[]), ...(live.futures||[]), ...(live.options||[])].map(t => convertMyTrade(t, 'open'));
+    const closedTrades = [...(closed.stocks||[]), ...(closed.futures||[]), ...(closed.options||[])].map(t => convertMyTrade(t, 'closed'));
+    merged.trades = [...liveTrades, ...closedTrades];
+  } else if (Array.isArray(s.trades)) {
+    merged.trades = s.trades;
+  }
+
   if (Array.isArray(s.portfolio)) merged.portfolio = s.portfolio;
   if (Array.isArray(s.coreClosed)) merged.coreClosed = s.coreClosed;
   if (Array.isArray(s.priority)) merged.priority = s.priority;
   if (Array.isArray(s.watchlists) && s.watchlists.length) merged.watchlists = s.watchlists;
   if (Array.isArray(s.strategies)) merged.strategies = s.strategies;
   if (s.settings && typeof s.settings === 'object') merged.settings = { ...merged.settings, ...s.settings };
-  // Ensure trades have tags arrays
   merged.trades.forEach(t => { if (!Array.isArray(t.tags)) t.tags = []; });
   return merged;
 }
@@ -2416,7 +2449,18 @@ function openEditTradeModal(tradeId) {
         <div class="form-group"><label class="form-label">Entry Qty</label><input class="form-input mono" id="et-qty" type="number" step="1" value="${t.entryQty}"></div>
         <div class="form-group"><label class="form-label">Entry Date</label><input class="form-input mono" id="et-date" type="datetime-local" value="${(t.entryDate || '').slice(0,16)}"></div>
       </div>
-      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="et-desc" rows="3">${escapeHtml(t.entryDesc || '')}</textarea></div>
+      <div class="form-group"><label class="form-label">Entry Notes</label><textarea class="form-textarea" id="et-desc" rows="3">${escapeHtml(t.entryDesc || '')}</textarea></div>
+      ${t.status === 'closed' ? `
+      <div style="border-top: 1px solid var(--border); margin: 8px 0 16px; padding-top: 16px;">
+        <div style="font-size: 11px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;">Exit Details</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Exit Price ₹</label><input class="form-input mono" id="et-exit-price" type="number" step="0.01" value="${t.exitPrice || ''}"></div>
+          <div class="form-group"><label class="form-label">Exit Qty</label><input class="form-input mono" id="et-exit-qty" type="number" step="1" value="${t.exitQty || ''}"></div>
+          <div class="form-group"><label class="form-label">Exit Date</label><input class="form-input mono" id="et-exit-date" type="datetime-local" value="${(t.exitDate || t.closedAt || '').slice(0,16)}"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Realized P&L ₹</label><input class="form-input mono" id="et-pnl" type="number" step="0.01" value="${t.realizedPnl != null ? t.realizedPnl : ''}"></div>
+        <div class="form-group"><label class="form-label">Exit Notes</label><textarea class="form-textarea" id="et-exit-desc" rows="2">${escapeHtml(t.exitDesc || '')}</textarea></div>
+      </div>` : ''}
       <div class="form-group">
         <label class="form-label">Before Chart (Entry)</label>
         <div id="et-entry-container"></div>
@@ -2496,8 +2540,19 @@ function openEditTradeModal(tradeId) {
     const dt = document.getElementById('et-date').value;
     if (dt) t.entryDate = new Date(dt).toISOString();
     t.entryDesc = document.getElementById('et-desc').value;
+    if (t.status === 'closed') {
+      const ep = parseFloat(document.getElementById('et-exit-price').value);
+      if (!isNaN(ep) && ep > 0) t.exitPrice = ep;
+      const eq = parseFloat(document.getElementById('et-exit-qty').value);
+      if (!isNaN(eq) && eq > 0) t.exitQty = eq;
+      const ed = document.getElementById('et-exit-date').value;
+      if (ed) { t.exitDate = new Date(ed).toISOString(); t.closedAt = t.exitDate; }
+      const pnl = parseFloat(document.getElementById('et-pnl').value);
+      if (!isNaN(pnl)) t.realizedPnl = pnl;
+      t.exitDesc = document.getElementById('et-exit-desc').value;
+      t.exitChart = newExitChart;
+    }
     t.entryChart = newEntryChart;
-    if (t.status === 'closed') t.exitChart = newExitChart;
     await saveState();
     closeModal();
     showToast('Trade updated', 'success');
@@ -3621,11 +3676,22 @@ async function restoreJsonFile(event) {
   try {
     const text = await file.text();
     const data = JSON.parse(text);
-    if (!data || !Array.isArray(data.trades)) {
-      return showToast('Invalid backup file (no trades array)', 'error');
+    const isMyTradesFormat = data && data.trades && !Array.isArray(data.trades) && (data.trades.live || data.trades.closed);
+    if (!data || (!Array.isArray(data.trades) && !isMyTradesFormat)) {
+      return showToast('Invalid backup file — expected Naz Trades or MyTrades JSON', 'error');
+    }
+    const isMyTrades = isMyTradesFormat;
+    let tradeCount = 0;
+    if (Array.isArray(data.trades)) {
+      tradeCount = data.trades.length;
+    } else if (isMyTrades) {
+      const t = data.trades;
+      ['stocks','futures','options'].forEach(c => {
+        tradeCount += ((t.live||{})[c]||[]).length + ((t.closed||{})[c]||[]).length;
+      });
     }
     const counts = {
-      trades: data.trades.length,
+      trades: tradeCount,
       portfolio: Array.isArray(data.portfolio) ? data.portfolio.length : 0,
       priority: Array.isArray(data.priority) ? data.priority.length : 0,
       watchlists: Array.isArray(data.watchlists) ? data.watchlists.length : 0,
