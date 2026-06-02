@@ -8,8 +8,36 @@
 <meta name="theme-color" content="#0f172a">
 <meta name="apple-mobile-web-app-title" content="Naz Trades">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%230f172a'/><path d='M 12,52 L 12,12 L 52,52 L 52,12' stroke='%23e2e8f0' stroke-width='8' fill='none' stroke-linecap='butt' stroke-linejoin='miter'/><line x1='6' y1='60' x2='54' y2='10' stroke='%2322c55e' stroke-width='4.5' stroke-linecap='round'/><path d='M 58,6 L 46,10 L 51,20 Z' fill='%2322c55e'/></svg>" type="image/svg+xml">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%230f172a'/><path d='M 35,157 L 35,35 L 157,157 L 157,35' stroke='%23e2e8f0' stroke-width='24' fill='none' stroke-linecap='butt' stroke-linejoin='miter'/><line x1='18' y1='180' x2='162' y2='30' stroke='%2322c55e' stroke-width='13.5' stroke-linecap='round'/><path d='M 174,18 L 138,30 L 153,60 Z' fill='%2322c55e'/></svg>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='30' fill='%230f172a'/><path d='M 35,157 L 35,35 L 157,157 L 157,35' stroke='%23e2e8f0' stroke-width='24' fill='none' stroke-linecap='butt' stroke-linejoin='miter'/><line x1='18' y1='180' x2='162' y2='30' stroke='%2322c55e' stroke-width='13.5' stroke-linecap='round'/><path d='M 174,18 L 138,30 L 153,60 Z' fill='%2322c55e'/></svg>" type="image/svg+xml">
 <meta name="description" content="Naz Trades — offline trading journal for Indian traders">
+<script>
+(function(){
+  var svg192 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="30" fill="#0f172a"/><path d="M 35,157 L 35,35 L 157,157 L 157,35" stroke="#e2e8f0" stroke-width="24" fill="none" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="18" y1="180" x2="162" y2="30" stroke="#22c55e" stroke-width="13.5" stroke-linecap="round"/><path d="M 174,18 L 138,30 L 153,60 Z" fill="#22c55e"/></svg>';
+  var svg512 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#0f172a"/><path d="M 93,419 L 93,93 L 419,419 L 419,93" stroke="#e2e8f0" stroke-width="64" fill="none" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="48" y1="480" x2="432" y2="80" stroke="#22c55e" stroke-width="36" stroke-linecap="round"/><path d="M 464,48 L 368,80 L 408,160 Z" fill="#22c55e"/></svg>';
+  var manifest = {
+    name: 'Naz Trades',
+    short_name: 'Naz Trades',
+    description: 'Offline trading journal for Indian traders',
+    start_url: '.',
+    display: 'standalone',
+    orientation: 'portrait',
+    theme_color: '#0f172a',
+    background_color: '#0f172a',
+    icons: [
+      { src: 'data:image/svg+xml,' + encodeURIComponent(svg192), type: 'image/svg+xml', sizes: '192x192', purpose: 'any maskable' },
+      { src: 'data:image/svg+xml,' + encodeURIComponent(svg512), type: 'image/svg+xml', sizes: '512x512', purpose: 'any maskable' }
+    ]
+  };
+  try {
+    var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = url;
+    document.head.appendChild(link);
+  } catch(e) {}
+})();
+</script>
 <title>Naz Trades</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
