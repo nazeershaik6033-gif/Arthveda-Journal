@@ -3741,13 +3741,23 @@ async function importZerodhaTradebook(event) {
 
     const header = rows[headerIdx].map(c => String(c).toLowerCase().trim());
     const symbolCol = header.findIndex(c => c === 'tradingsymbol' || c === 'symbol' || c.includes('symbol'));
-    const typeCol = header.findIndex(c => c.includes('trade_type') || c.includes('buy') || c.includes('side'));
-    const qtyCol = header.findIndex(c => c.includes('quantity') || c === 'qty');
-    const priceCol = header.findIndex(c => c.includes('price'));
+    const typeCol = header.findIndex(c =>
+      c === 'trade_type' || c === 'trade type' ||
+      c.includes('trade_type') || c.includes('trade type') ||
+      c.includes('transaction_type') || c.includes('transaction type') ||
+      c === 'type' || c === 'order type' || c.includes('buy/sell') || c.includes('side') || c.includes('action')
+    );
+    const qtyCol = header.findIndex(c => c.includes('quantity') || c === 'qty' || c === 'vol' || c.includes('volume'));
+    const priceCol = header.findIndex(c => c === 'price' || c === 'trade price' || c.includes('price'));
     const dateCol = header.findIndex(c => c.includes('date'));
 
     if (symbolCol < 0 || qtyCol < 0 || priceCol < 0 || typeCol < 0) {
-      return showToast('Missing required columns (symbol, trade_type, quantity, price)', 'error');
+      const missing = [];
+      if (symbolCol < 0) missing.push('symbol/tradingsymbol');
+      if (typeCol < 0) missing.push('trade_type / Trade Type');
+      if (qtyCol < 0) missing.push('quantity');
+      if (priceCol < 0) missing.push('price');
+      return showToast(`Missing columns: ${missing.join(', ')}. Found: ${header.filter(Boolean).join(', ')}`, 'error');
     }
 
     // Group by symbol
@@ -3762,10 +3772,12 @@ async function importZerodhaTradebook(event) {
       const date = r[dateCol] || '';
       if (!qty || !price) continue;
       if (!groups[sym]) groups[sym] = { symbol: sym, buyQty: 0, buyValue: 0, sellQty: 0, sellValue: 0, lastDate: '' };
-      if (type === 'BUY' || type === 'B') {
+      const isBuy = type === 'BUY' || type === 'B' || type === 'BUY ORDER' || type.startsWith('BUY');
+      const isSell = type === 'SELL' || type === 'S' || type === 'SELL ORDER' || type.startsWith('SELL');
+      if (isBuy) {
         groups[sym].buyQty += qty;
         groups[sym].buyValue += qty * price;
-      } else if (type === 'SELL' || type === 'S') {
+      } else if (isSell) {
         groups[sym].sellQty += qty;
         groups[sym].sellValue += qty * price;
       }
