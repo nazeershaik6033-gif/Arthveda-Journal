@@ -3868,10 +3868,7 @@ async function importZerodhaTradebook(event) {
     let headerIdx = -1;
     for (let i = 0; i < rows.length; i++) {
       const lower = rows[i].map(c => String(c).toLowerCase());
-      if (lower.some(c => c.includes('symbol') || c.includes('tradingsymbol'))) {
-        headerIdx = i;
-        break;
-      }
+      if (lower.some(c => c.includes('symbol') || c.includes('tradingsymbol'))) { headerIdx = i; break; }
     }
     if (headerIdx === -1) return showToast('Could not find header row (looking for symbol/tradingsymbol column)', 'error');
 
@@ -3896,114 +3893,167 @@ async function importZerodhaTradebook(event) {
       return showToast(`Missing columns: ${missing.join(', ')}. Found: ${header.filter(Boolean).join(', ')}`, 'error');
     }
 
-    // Group by symbol
-    const groups = {};
+    // Parse all individual rows grouped by symbol (preserve order)
+    const groupMap = {};
+    const groupOrder = [];
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const r = rows[i];
       const sym = String(r[symbolCol] || '').trim().toUpperCase();
       if (!sym) continue;
-      const type = String(r[typeCol] || '').trim().toUpperCase();
+      const rawType = String(r[typeCol] || '').trim().toUpperCase();
       const qty = parseFloat(r[qtyCol]) || 0;
       const price = parseFloat(r[priceCol]) || 0;
-      const date = r[dateCol] || '';
+      const date = dateCol >= 0 ? String(r[dateCol] || '').trim() : '';
       if (!qty || !price) continue;
-      if (!groups[sym]) groups[sym] = { symbol: sym, buyQty: 0, buyValue: 0, sellQty: 0, sellValue: 0, lastDate: '' };
-      const isBuy = type === 'BUY' || type === 'B' || type === 'BUY ORDER' || type.startsWith('BUY');
-      const isSell = type === 'SELL' || type === 'S' || type === 'SELL ORDER' || type.startsWith('SELL');
-      if (isBuy) {
-        groups[sym].buyQty += qty;
-        groups[sym].buyValue += qty * price;
-      } else if (isSell) {
-        groups[sym].sellQty += qty;
-        groups[sym].sellValue += qty * price;
-      }
-      if (date) groups[sym].lastDate = String(date);
+      const isBuy = rawType === 'BUY' || rawType === 'B' || rawType === 'BUY ORDER' || rawType.startsWith('BUY');
+      const isSell = rawType === 'SELL' || rawType === 'S' || rawType === 'SELL ORDER' || rawType.startsWith('SELL');
+      if (!isBuy && !isSell) continue;
+      if (!groupMap[sym]) { groupMap[sym] = { symbol: sym, rows: [] }; groupOrder.push(sym); }
+      groupMap[sym].rows.push({ date, type: isBuy ? 'BUY' : 'SELL', qty, price, checked: true });
     }
 
-    const symbols = Object.values(groups).filter(g => g.buyQty > 0);
+    const symbols = groupOrder.map(s => groupMap[s]).filter(g => g.rows.some(r => r.type === 'BUY'));
     if (!symbols.length) return showToast('No buy trades found in this file', 'error');
 
-    symbols.forEach(g => {
-      g.avgBuy = g.buyValue / g.buyQty;
-      g.openQty = g.buyQty - g.sellQty;
-      g.avgSell = g.sellQty > 0 ? g.sellValue / g.sellQty : 0;
-      g.status = g.openQty > 0 ? 'open' : 'closed';
-      g.assignTo = g.openQty > 0 ? 'core' : 'satellite';
-    });
+    function zCalc(g) {
+      let buyQty = 0, buyValue = 0, sellQty = 0, sellValue = 0;
+      g.rows.filter(r => r.checked).forEach(r => {
+        if (r.type === 'BUY') { buyQty += r.qty; buyValue += r.qty * r.price; }
+        else { sellQty += r.qty; sellValue += r.qty * r.price; }
+      });
+      const avgBuy = buyQty > 0 ? buyValue / buyQty : 0;
+      const openQty = Math.max(0, buyQty - sellQty);
+      const avgSell = sellQty > 0 ? sellValue / sellQty : 0;
+      const pnl = sellQty > 0 ? sellValue - buyValue : null;
+      const status = buyQty === 0 ? 'empty' : openQty > 0 ? 'open' : 'closed';
+      return { buyQty, buyValue, sellQty, sellValue, avgBuy, openQty, avgSell, pnl, status };
+    }
+
+    function zLiveHtml(sum) {
+      if (sum.buyQty === 0) return `<span style="color:var(--error)">No buy rows selected — this symbol will be skipped</span>`;
+      let h = `<span style="color:var(--text)">Avg Buy <strong class="mono">${formatINR(sum.avgBuy)}</strong></span>`
+             + `<span style="margin:0 8px;color:var(--border)">|</span>`
+             + `<span>Buy Qty <strong>${sum.buyQty}</strong></span>`;
+      if (sum.sellQty > 0) {
+        h += `<span style="margin:0 8px;color:var(--border)">|</span>`
+           + `<span style="color:var(--text)">Avg Sell <strong class="mono">${formatINR(sum.avgSell)}</strong></span>`
+           + `<span style="margin:0 8px;color:var(--border)">|</span>`
+           + `<span>Sell Qty <strong>${sum.sellQty}</strong></span>`
+           + `<span style="margin:0 8px;color:var(--border)">|</span>`
+           + `<span>Open Qty <strong>${sum.openQty}</strong></span>`;
+        if (sum.pnl !== null) {
+          h += `<span style="margin:0 8px;color:var(--border)">|</span>`
+             + `<span class="${sum.pnl >= 0 ? 'pnl-positive' : 'pnl-negative'}">P&amp;L <strong>${formatPnl(sum.pnl)}</strong></span>`;
+        }
+      }
+      return h;
+    }
+
+    function zGroupHtml(g, gi) {
+      const sum = zCalc(g);
+      const assignTo = sum.status === 'open' ? 'core' : 'satellite';
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-3);flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="mono" style="font-weight:700;font-size:15px;">${escapeHtml(g.symbol)}</span>
+              <span class="badge ${sum.status === 'open' ? 'warning' : 'success'}" id="zs-${gi}">${sum.status.toUpperCase()}</span>
+              <span style="font-size:11px;color:var(--text-muted);">${g.rows.length} row${g.rows.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <select class="form-select" id="za-${gi}" style="padding:4px 8px;font-size:12px;min-width:120px;">
+                <option value="core" ${assignTo === 'core' ? 'selected' : ''}>→ Core Holdings</option>
+                <option value="satellite" ${assignTo === 'satellite' ? 'selected' : ''}>→ Satellite Trade</option>
+                <option value="skip">✗ Skip</option>
+              </select>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);background:var(--surface-2);">
+                  <th style="padding:6px 10px;width:36px;">
+                    <input type="checkbox" checked title="Select/deselect all" onchange="zerodhaToggleAll(${gi},this.checked)">
+                  </th>
+                  <th style="padding:6px 10px;text-align:left;color:var(--text-subtle);font-weight:500;">Date</th>
+                  <th style="padding:6px 10px;text-align:left;color:var(--text-subtle);font-weight:500;">Type</th>
+                  <th style="padding:6px 10px;text-align:right;color:var(--text-subtle);font-weight:500;">Qty</th>
+                  <th style="padding:6px 10px;text-align:right;color:var(--text-subtle);font-weight:500;">Price</th>
+                  <th style="padding:6px 10px;text-align:right;color:var(--text-subtle);font-weight:500;">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${g.rows.map((row, ri) => `
+                  <tr id="zr-${gi}-${ri}" style="border-bottom:1px solid var(--border);transition:opacity 0.15s;">
+                    <td style="padding:6px 10px;">
+                      <input type="checkbox" checked onchange="zerodhaToggleRow(${gi},${ri},this.checked)">
+                    </td>
+                    <td style="padding:6px 10px;color:var(--text-muted);">${escapeHtml(row.date)}</td>
+                    <td style="padding:6px 10px;">
+                      <span class="badge ${row.type === 'BUY' ? 'warning' : 'error'}" style="font-size:10px;">${row.type}</span>
+                    </td>
+                    <td style="padding:6px 10px;text-align:right;" class="mono">${row.qty}</td>
+                    <td style="padding:6px 10px;text-align:right;" class="mono">${formatINR(row.price)}</td>
+                    <td style="padding:6px 10px;text-align:right;" class="mono">${formatINR(row.qty * row.price)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div id="zl-${gi}" style="padding:8px 14px;background:var(--surface-2);font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+            ${zLiveHtml(sum)}
+          </div>
+        </div>`;
+    }
 
     showModal({
-      title: `Zerodha Import — ${symbols.length} symbol${symbols.length === 1 ? '' : 's'} found`,
+      title: `Zerodha Import — ${symbols.length} symbol${symbols.length === 1 ? '' : 's'}`,
       size: 'lg',
       body: `
-        <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 12px;">Review and choose where each symbol goes. Open positions → Core Holdings. Fully closed → Satellite (logged as a closed trade).</p>
-        <div class="table-wrap">
-          <table class="data-table" id="zerodhaTable">
-            <thead>
-              <tr><th>Symbol</th><th>Buy Qty</th><th>Avg Buy</th><th>Open Qty</th><th>Status</th><th>Assign To</th></tr>
-            </thead>
-            <tbody>
-              ${symbols.map((g, i) => `
-                <tr>
-                  <td>${escapeHtml(g.symbol)}</td>
-                  <td>${g.buyQty}</td>
-                  <td>${formatINR(g.avgBuy)}</td>
-                  <td>${g.openQty}</td>
-                  <td><span class="badge ${g.status === 'open' ? 'warning' : 'success'}">${g.status}</span></td>
-                  <td>
-                    <select class="form-select" data-idx="${i}" style="padding: 4px 8px; font-size: 12px;">
-                      <option value="core" ${g.assignTo === 'core' ? 'selected' : ''}>Core</option>
-                      <option value="satellite" ${g.assignTo === 'satellite' ? 'selected' : ''}>Satellite</option>
-                      <option value="skip">Skip</option>
-                    </select>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
+        <p style="color:var(--text-muted);font-size:13px;margin:0 0 14px;">
+          All individual BUY/SELL rows are shown per symbol. Uncheck rows to exclude them — totals update live.
+          Set where each symbol goes, then click <strong>Import</strong>.
+        </p>
+        <div>${symbols.map((g, gi) => zGroupHtml(g, gi)).join('')}</div>
       `,
       footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn" id="confirmZerodhaBtn">Import Selected</button>`
     });
 
+    // Store on window so toggle helpers can access
+    window._zSymbols = symbols;
+    window._zCalc = zCalc;
+    window._zLiveHtml = zLiveHtml;
+
     document.getElementById('confirmZerodhaBtn').onclick = async () => {
       let imported = 0;
-      document.querySelectorAll('#zerodhaTable select').forEach(sel => {
-        const idx = parseInt(sel.dataset.idx);
-        const choice = sel.value;
-        const g = symbols[idx];
-        if (choice === 'skip') return;
+      symbols.forEach((g, gi) => {
+        const choice = document.getElementById(`za-${gi}`)?.value;
+        if (!choice || choice === 'skip') return;
+        const sum = zCalc(g);
+        if (sum.buyQty === 0) return;
         if (choice === 'core') {
           state.portfolio.push({
-            id: generateId(),
-            symbol: g.symbol,
-            tradeName: 'Imported from Zerodha',
-            qty: g.openQty || g.buyQty,
-            avgPrice: g.avgBuy,
-            addedAt: new Date().toISOString()
+            id: generateId(), symbol: g.symbol, tradeName: 'Imported from Zerodha',
+            qty: sum.openQty > 0 ? sum.openQty : sum.buyQty,
+            avgPrice: sum.avgBuy, addedAt: new Date().toISOString()
           });
-          imported++;
         } else {
           state.trades.push({
-            id: generateId(),
-            portfolioType: 'satellite',
-            status: g.openQty > 0 ? 'open' : 'closed',
-            category: 'stocks',
-            symbol: g.symbol,
-            tradeName: 'Imported from Zerodha',
-            entryPrice: g.avgBuy,
-            entryQty: g.buyQty,
+            id: generateId(), portfolioType: 'satellite',
+            status: sum.openQty > 0 ? 'open' : 'closed',
+            category: 'stocks', symbol: g.symbol, tradeName: 'Imported from Zerodha',
+            entryPrice: sum.avgBuy, entryQty: sum.buyQty,
             entryDate: new Date().toISOString(),
             entryDesc: 'Auto-imported from Zerodha tradebook',
-            exitPrice: g.openQty > 0 ? null : g.avgSell,
-            exitQty: g.openQty > 0 ? null : g.sellQty,
-            exitDate: g.openQty > 0 ? null : new Date().toISOString(),
-            realizedPnl: g.openQty > 0 ? null : (g.sellValue - g.buyValue),
-            closedAt: g.openQty > 0 ? null : new Date().toISOString(),
-            tags: ['zerodha-import'],
-            createdAt: new Date().toISOString()
+            exitPrice: sum.openQty > 0 ? null : sum.avgSell,
+            exitQty: sum.openQty > 0 ? null : sum.sellQty,
+            exitDate: sum.openQty > 0 ? null : new Date().toISOString(),
+            realizedPnl: sum.openQty > 0 ? null : sum.pnl,
+            closedAt: sum.openQty > 0 ? null : new Date().toISOString(),
+            tags: ['zerodha-import'], createdAt: new Date().toISOString()
           });
-          imported++;
         }
+        imported++;
       });
       await saveState();
       closeModal();
@@ -4013,6 +4063,41 @@ async function importZerodhaTradebook(event) {
   } catch (e) {
     showToast('Failed to parse Zerodha file: ' + e.message, 'error');
   }
+}
+
+function zerodhaToggleRow(gi, ri, checked) {
+  if (!window._zSymbols || !window._zSymbols[gi]) return;
+  window._zSymbols[gi].rows[ri].checked = checked;
+  const row = document.getElementById(`zr-${gi}-${ri}`);
+  if (row) row.style.opacity = checked ? '1' : '0.35';
+  zerodhaRefreshGroup(gi);
+}
+
+function zerodhaToggleAll(gi, checked) {
+  if (!window._zSymbols || !window._zSymbols[gi]) return;
+  const g = window._zSymbols[gi];
+  g.rows.forEach((r, ri) => {
+    r.checked = checked;
+    const row = document.getElementById(`zr-${gi}-${ri}`);
+    if (row) {
+      row.style.opacity = checked ? '1' : '0.35';
+      const cb = row.querySelector('input[type=checkbox]');
+      if (cb) cb.checked = checked;
+    }
+  });
+  zerodhaRefreshGroup(gi);
+}
+
+function zerodhaRefreshGroup(gi) {
+  if (!window._zSymbols || !window._zCalc || !window._zLiveHtml) return;
+  const g = window._zSymbols[gi];
+  const sum = window._zCalc(g);
+  const liveEl = document.getElementById(`zl-${gi}`);
+  if (liveEl) liveEl.innerHTML = window._zLiveHtml(sum);
+  const statusEl = document.getElementById(`zs-${gi}`);
+  if (statusEl) { statusEl.textContent = sum.status.toUpperCase(); statusEl.className = `badge ${sum.status === 'open' ? 'warning' : 'success'}`; }
+  const assignEl = document.getElementById(`za-${gi}`);
+  if (assignEl && assignEl.value !== 'skip') assignEl.value = sum.status === 'open' ? 'core' : 'satellite';
 }
 
 /* ========================================================================
