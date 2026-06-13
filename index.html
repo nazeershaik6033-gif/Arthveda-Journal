@@ -303,11 +303,93 @@ html.light .brand-logo {
   color: var(--primary);
   background: var(--primary-muted);
 }
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+.header-brand-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.header-brand-logo svg { display: block; border-radius: 7px; }
+.header-brand-name {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
 .header-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
 }
+
+/* Header three-dots dropdown */
+.header-menu {
+  position: absolute;
+  top: 58px;
+  right: max(12px, calc(50% - 260px + 12px));
+  width: min(280px, calc(100vw - 24px));
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+  z-index: 60;
+  overflow: hidden;
+  display: none;
+  animation: fadeUp 0.16s ease;
+}
+.header-menu.open { display: block; }
+.header-menu-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-subtle);
+  font-weight: 600;
+  padding: 12px 16px 6px;
+}
+.header-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  padding: 11px 16px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.header-menu-row:hover { background: var(--surface-3); }
+.header-menu-row .hm-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.header-menu-row .hm-left svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-muted); }
+.header-menu-row .hm-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-menu-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-4);
+  border-radius: 20px;
+  padding: 2px 9px;
+  flex-shrink: 0;
+}
+.header-menu-divider { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+.header-menu-row.accent { color: var(--primary); }
+.header-menu-row.accent svg { color: var(--primary); }
+.header-menu-empty { padding: 6px 16px 12px; color: var(--text-subtle); font-size: 13px; }
 .icon-btn {
   background: transparent;
   border: 1px solid var(--border-subtle);
@@ -1425,23 +1507,33 @@ table.data-table tr:last-child td { border-bottom: none; }
     <button class="icon-btn" id="menuBtn" title="Menu" aria-label="Open menu">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-    <h1 class="header-title" id="headerTitle">Dashboard</h1>
+    <div class="header-brand">
+      <span class="header-brand-logo">
+        <svg width="28" height="28" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="44" height="44" rx="9" fill="#0f172a"/>
+          <path d="M 11,34 L 11,11 L 33,34 L 33,11" stroke="#e2e8f0" stroke-width="4.5" fill="none" stroke-linecap="butt" stroke-linejoin="miter"/>
+          <line x1="7" y1="38" x2="34" y2="9" stroke="#22c55e" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M 37,6 L 29,9 L 33,15 Z" fill="#22c55e"/>
+        </svg>
+      </span>
+      <span class="header-brand-name">NazTrades</span>
+    </div>
     <div class="header-actions">
+      <button class="icon-btn" id="aiBtn" title="AI" aria-label="AI">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/></svg>
+      </button>
       <button class="icon-btn" id="searchBtn" title="Search" aria-label="Search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
       </button>
       <button class="icon-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle theme">
-        <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-        <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 3a9 9 0 0 0 0 18z"/></svg>
       </button>
-      <button class="icon-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle theme">
-        <!-- sun icon (shown in dark mode) -->
-        <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-        <!-- moon icon (shown in light mode) -->
-        <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <button class="icon-btn" id="headerMenuBtn" title="Watchlists" aria-label="Watchlists menu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
       </button>
     </div>
   </div>
+  <div class="header-menu" id="headerMenu"></div>
   <div class="market-banner">
     <div class="market-status" id="marketStatus">
       <span class="market-dot"></span>
@@ -1910,9 +2002,8 @@ function switchTab(tabId) {
   if (panel) panel.classList.add('active');
   document.querySelectorAll('.dock-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.drawer-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
-  const tab = TABS.find(t => t.id === tabId);
-  const titleEl = document.getElementById('headerTitle');
-  if (titleEl && tab) titleEl.textContent = tab.label;
+  // Header brand stays static ("NazTrades") — title no longer changes per tab
+  closeHeaderMenu();
   // Hide the FAB while on the entry screen (it's redundant there)
   const fab = document.getElementById('fabBtn');
   if (fab) fab.style.display = (tabId === 'entry') ? 'none' : 'flex';
@@ -1927,6 +2018,58 @@ function openDrawer() {
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+/* ---- Header AI button (placeholder until features are defined) ---- */
+function onAiClick() {
+  showToast('AI features coming soon ✨', 'info');
+}
+
+/* ---- Header three-dots watchlist menu ---- */
+function renderHeaderMenu() {
+  const menu = document.getElementById('headerMenu');
+  if (!menu) return;
+  const lists = state.watchlists || [];
+  const eyeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const plusIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+  const gearIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+  const rows = lists.length
+    ? lists.map(wl => `
+        <button class="header-menu-row" onclick="openWatchlistFromMenu('${wl.id}')">
+          <span class="hm-left">${eyeIcon}<span class="hm-name">${escapeHtml(wl.name)}</span></span>
+          <span class="header-menu-count">${(wl.symbols || []).length}</span>
+        </button>`).join('')
+    : `<div class="header-menu-empty">No watchlists yet.</div>`;
+  menu.innerHTML = `
+    <div class="header-menu-label">Watchlists</div>
+    ${rows}
+    <div class="header-menu-divider"></div>
+    <button class="header-menu-row accent" onclick="closeHeaderMenu(); newWatchlistPrompt();">
+      <span class="hm-left">${plusIcon}<span class="hm-name">New Watchlist</span></span>
+    </button>
+    <button class="header-menu-row" onclick="closeHeaderMenu(); switchTab('watchlist');">
+      <span class="hm-left">${gearIcon}<span class="hm-name">Manage Watchlists</span></span>
+    </button>
+  `;
+}
+
+function toggleHeaderMenu() {
+  const menu = document.getElementById('headerMenu');
+  if (!menu) return;
+  if (menu.classList.contains('open')) { closeHeaderMenu(); return; }
+  renderHeaderMenu();
+  menu.classList.add('open');
+}
+
+function closeHeaderMenu() {
+  const menu = document.getElementById('headerMenu');
+  if (menu) menu.classList.remove('open');
+}
+
+function openWatchlistFromMenu(wlId) {
+  if (state.watchlists.find(w => w.id === wlId)) activeSubTab.wl = wlId;
+  closeHeaderMenu();
+  switchTab('watchlist');
 }
 
 function renderActivePanel() {
@@ -5228,6 +5371,16 @@ async function init() {
   document.getElementById('drawerCloseBtn').onclick = closeDrawer;
   document.getElementById('drawerOverlay').onclick = closeDrawer;
   document.getElementById('fabBtn').onclick = () => switchTab('entry');
+  document.getElementById('aiBtn').onclick = onAiClick;
+  document.getElementById('headerMenuBtn').onclick = (e) => { e.stopPropagation(); toggleHeaderMenu(); };
+  // Close the header dropdown when clicking anywhere outside it
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('headerMenu');
+    if (menu && menu.classList.contains('open') &&
+        !menu.contains(e.target) && e.target.closest('#headerMenuBtn') === null) {
+      closeHeaderMenu();
+    }
+  });
   // Keyboard shortcut: Cmd/Ctrl+K
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
