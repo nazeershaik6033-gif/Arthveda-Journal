@@ -1497,6 +1497,88 @@ table.data-table tr:last-child td { border-bottom: none; }
 }
 .rule-choice-btn.active-followed { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
 .rule-choice-btn.active-not { background: var(--error-bg); border-color: var(--error-border); color: var(--error); }
+
+/* ---- AI section ---- */
+.ai-hub-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-subtle); font-weight: 600; margin: 4px 0 12px;
+}
+.ai-hub-row {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  background: var(--surface-2); border: 1px solid var(--border-subtle);
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+  text-align: left; font-family: inherit; transition: border-color 0.15s, transform 0.1s;
+}
+.ai-hub-row:hover { border-color: var(--border); }
+.ai-hub-row:active { transform: scale(0.99); }
+.ai-hub-icon {
+  width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; background: var(--surface-4);
+}
+.ai-hub-text { flex: 1; min-width: 0; }
+.ai-hub-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.ai-hub-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.ai-hub-chev { color: var(--text-subtle); flex-shrink: 0; }
+
+.ai-subhead {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.ai-back-btn {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface-3); border: 1px solid var(--border-subtle);
+  color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.ai-back-btn:hover { border-color: var(--border); }
+.ai-subhead h2 { font-size: 18px; font-weight: 700; margin: 0; }
+
+/* Chat */
+.ai-chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 230px); min-height: 360px; }
+.ai-chat-msgs { flex: 1; overflow-y: auto; padding: 4px 2px 12px; display: flex; flex-direction: column; gap: 12px; }
+.ai-bubble {
+  max-width: 86%; padding: 12px 14px; border-radius: 16px; font-size: 14px; line-height: 1.55;
+  white-space: pre-wrap; word-wrap: break-word;
+}
+.ai-bubble.assistant { background: var(--surface-3); border: 1px solid var(--border-subtle); align-self: flex-start; border-bottom-left-radius: 5px; }
+.ai-bubble.user { background: var(--primary); color: #fff; align-self: flex-end; border-bottom-right-radius: 5px; }
+.ai-bubble img { max-width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
+.ai-bubble.thinking { color: var(--text-muted); font-style: italic; }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 0; }
+.ai-chip {
+  background: var(--surface-3); border: 1px solid var(--border-subtle); border-radius: 18px;
+  padding: 7px 12px; font-size: 12px; color: var(--text); cursor: pointer; font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ai-chip:hover { border-color: var(--primary); background: var(--primary-muted); }
+.ai-input-bar {
+  display: flex; align-items: center; gap: 8px; padding: 8px;
+  background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 16px; margin-top: 8px;
+}
+.ai-input-bar input[type=text] {
+  flex: 1; background: transparent; border: none; color: var(--text);
+  font-family: inherit; font-size: 14px; outline: none; min-width: 0;
+}
+.ai-icon-sm {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; cursor: pointer;
+  background: var(--surface-3); border: 1px solid var(--border-subtle); color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.ai-icon-sm:hover { color: var(--primary); border-color: var(--primary); }
+.ai-send-btn { background: var(--primary); color: #fff; border-color: var(--primary); }
+.ai-send-btn:hover { background: var(--primary-hover); color: #fff; }
+.ai-attach-preview { display: flex; align-items: center; gap: 8px; padding: 0 4px 8px; }
+.ai-attach-preview img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; }
+.ai-attach-preview button { background: none; border: none; color: var(--error); cursor: pointer; font-size: 13px; }
+
+.ai-result {
+  background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 14px;
+  padding: 16px; margin-top: 14px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;
+}
+.ai-nokey {
+  background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 12px;
+  padding: 12px 14px; font-size: 13px; color: var(--text); margin-bottom: 14px;
+}
+.ai-nokey a { color: var(--primary); cursor: pointer; }
 </style>
 </head>
 <body>
@@ -1577,6 +1659,7 @@ table.data-table tr:last-child td { border-bottom: none; }
   <div class="tab-panel" id="panel-calendar"></div>
   <div class="tab-panel" id="panel-analytics"></div>
   <div class="tab-panel" id="panel-strategy"></div>
+  <div class="tab-panel" id="panel-ai"></div>
   <div class="tab-panel" id="panel-settings"></div>
 </main>
 
@@ -1611,6 +1694,7 @@ const TABS = [
   { id: 'watchlist', label: 'Watchlist',  icon: 'eye',  group: 'menu' },
   { id: 'strategy',  label: 'Strategy',   icon: 'book', group: 'menu' },
   { id: 'settings',  label: 'Settings',   icon: 'cog',  group: 'menu' },
+  { id: 'ai',        label: 'AI',         icon: 'ai',   group: 'hidden' },
 ];
 
 const ICONS = {
@@ -1696,6 +1780,10 @@ let calendarMonth = new Date();
 let calendarFilter = 'all';
 let journalView = 'daily';        // daily | monthly | calendar
 let dashboardRange = 'all';       // 1w | 1m | ytd | all
+let aiView = 'hub';               // hub | chat | business | reviewer | insights | chart
+let aiChatMessages = [];          // {role:'user'|'assistant', text, image?}
+let aiBusy = false;
+let aiAttachImage = null;         // pending data-URL for chat attach
 window.livePrices = {};
 let refreshTimer = null;
 
@@ -2068,15 +2156,11 @@ function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
 }
 
-/* ---- Header AI button → opens AI Assistant settings ---- */
+/* ---- Header AI button → opens the AI section ---- */
 function onAiClick() {
   closeHeaderMenu();
-  switchTab('settings');
-  // Scroll to the AI card once the panel has rendered
-  setTimeout(() => {
-    const card = document.getElementById('aiSettingsCard');
-    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 60);
+  aiView = 'hub';
+  switchTab('ai');
 }
 
 /* ---- Header three-dots watchlist menu ---- */
@@ -2137,6 +2221,7 @@ function renderActivePanel() {
     case 'calendar':  renderCalendar(); break;
     case 'analytics': renderAnalytics(); break;
     case 'strategy':  renderStrategy(); break;
+    case 'ai':        renderAI(); break;
     case 'settings':  renderSettings(); break;
   }
 }
@@ -4472,6 +4557,342 @@ function deleteStrategyPrompt(id) {
     showToast('Note deleted', 'info');
     renderActivePanel();
   }, 'Delete');
+}
+
+/* ========================================================================
+   AI SECTION
+   ======================================================================== */
+function aiHasKey() {
+  const ai = state.settings.ai;
+  return !!(ai && ai.keys && ai.keys[ai.provider]);
+}
+function aiCurrentModelLabel() {
+  const ai = state.settings.ai;
+  const list = AI_MODELS[ai.provider] || [];
+  const found = list.find(m => m.id === ai.models[ai.provider]);
+  return found ? found.label : ai.models[ai.provider];
+}
+function aiNoKeyBanner() {
+  if (aiHasKey()) return '';
+  return `<div class="ai-nokey">⚠️ No API key set. <a onclick="switchTab('settings'); setTimeout(()=>{const c=document.getElementById('aiSettingsCard'); if(c) c.scrollIntoView({behavior:'smooth'});},80)">Add a Gemini or OpenRouter key in Settings</a> to use AI features.</div>`;
+}
+
+const AI_FEATURES = [
+  { id: 'chat',     icon: '✨', title: 'AI Assistant',     sub: 'Chat about stocks & your journal' },
+  { id: 'business', icon: '🏢', title: 'Business Analysis', sub: 'Enter a stock → full business breakdown' },
+  { id: 'reviewer', icon: '🔍', title: 'Trade Reviewer',    sub: 'Find mistakes & rule violations' },
+  { id: 'insights', icon: '💡', title: 'AI Insights',       sub: 'Performance patterns & suggestions' },
+  { id: 'chart',    icon: '📷', title: 'Chart Reader',      sub: 'Extract setup from a chart screenshot' },
+];
+
+function renderAI() {
+  const panel = document.getElementById('panel-ai');
+  if (aiView === 'hub') {
+    panel.innerHTML = `
+      <div class="page-header"><div>
+        <h1 class="page-title">AI</h1>
+        <p class="page-subtitle">Model: ${escapeHtml(aiCurrentModelLabel())} · ${state.settings.ai.provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'}</p>
+      </div></div>
+      ${aiNoKeyBanner()}
+      <div class="ai-hub-label">AI Tools</div>
+      ${AI_FEATURES.map(f => `
+        <button class="ai-hub-row" onclick="aiGoTo('${f.id}')">
+          <span class="ai-hub-icon">${f.icon}</span>
+          <span class="ai-hub-text">
+            <span class="ai-hub-title">${f.title}</span>
+            <span class="ai-hub-sub">${f.sub}</span>
+          </span>
+          <span class="ai-hub-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </button>`).join('')}
+    `;
+    return;
+  }
+  const feature = AI_FEATURES.find(f => f.id === aiView);
+  const head = `<div class="ai-subhead">
+      <button class="ai-back-btn" onclick="aiGoTo('hub')" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>${feature ? feature.title : 'AI'}</h2>
+    </div>`;
+  if (aiView === 'chat')     { panel.innerHTML = head + aiChatHTML(); aiScrollChat(); aiWireChat(); return; }
+  if (aiView === 'business') { panel.innerHTML = head + aiBusinessHTML(); return; }
+  if (aiView === 'reviewer') { panel.innerHTML = head + aiSimpleRunHTML('reviewer'); return; }
+  if (aiView === 'insights') { panel.innerHTML = head + aiSimpleRunHTML('insights'); return; }
+  if (aiView === 'chart')    { panel.innerHTML = head + aiChartHTML(); setupDropZone('aiChartDrop', 'aiChartFile', (b64) => aiReadChart(b64)); return; }
+}
+
+function aiGoTo(view) {
+  aiView = view;
+  if (view === 'chat' && aiChatMessages.length === 0) {
+    aiChatMessages.push({ role: 'assistant', text:
+      "Hi! I'm your trading assistant. Ask me to analyze a stock's business or review your trades.\n\nTry:\n• \"Analyze the business of RELIANCE\"\n• \"What's the bull vs bear case for INFY?\"\n• \"Review my open positions\"\n\nYou can also attach a chart screenshot 📷." });
+  }
+  renderAI();
+}
+
+/* ----- Chat ----- */
+function aiChatHTML() {
+  const msgs = aiChatMessages.map(m => `
+    <div class="ai-bubble ${m.role}">${escapeHtml(m.text)}${m.image ? `<img src="${m.image}">` : ''}</div>`).join('');
+  const thinking = aiBusy ? `<div class="ai-bubble assistant thinking" id="aiThinking">Thinking…</div>` : '';
+  const chips = `<div class="ai-chips">
+      <button class="ai-chip" onclick="aiChip('Analyze the business of ')">🏢 Analyze a business</button>
+      <button class="ai-chip" onclick="aiChip('Bull vs bear case for ')">⚖️ Bull vs bear</button>
+      <button class="ai-chip" onclick="aiChip('Review my open positions')">🔍 Review positions</button>
+    </div>`;
+  const attach = aiAttachImage ? `<div class="ai-attach-preview"><img src="${aiAttachImage}"><button onclick="aiClearAttach()">✕ remove image</button></div>` : '';
+  return `
+    ${aiNoKeyBanner()}
+    <div class="ai-chat-wrap">
+      <div class="ai-chat-msgs" id="aiChatMsgs">${msgs}${thinking}</div>
+      ${chips}
+      ${attach}
+      <div class="ai-input-bar">
+        <button class="ai-icon-sm" id="aiAttachBtn" title="Attach chart">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+        <input type="file" id="aiChatFile" accept="image/*" style="display:none">
+        <input type="text" id="aiChatInput" placeholder="Tell me about it…" ${aiBusy ? 'disabled' : ''}>
+        <button class="ai-icon-sm ai-send-btn" id="aiSendBtn" title="Send" ${aiBusy ? 'disabled' : ''}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>`;
+}
+function aiWireChat() {
+  const input = document.getElementById('aiChatInput');
+  const send = document.getElementById('aiSendBtn');
+  const attachBtn = document.getElementById('aiAttachBtn');
+  const file = document.getElementById('aiChatFile');
+  if (send) send.onclick = aiSendChat;
+  if (input) {
+    input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); aiSendChat(); } };
+    if (!aiBusy) input.focus();
+  }
+  if (attachBtn && file) {
+    attachBtn.onclick = () => file.click();
+    file.onchange = async (e) => {
+      const f = e.target.files[0];
+      if (f && f.type.startsWith('image/')) { aiAttachImage = await readFileAsBase64(f); renderAI(); }
+    };
+  }
+}
+function aiChip(text) {
+  const input = document.getElementById('aiChatInput');
+  if (input) { input.value = text; input.focus(); }
+}
+function aiClearAttach() { aiAttachImage = null; renderAI(); }
+function aiScrollChat() {
+  setTimeout(() => { const el = document.getElementById('aiChatMsgs'); if (el) el.scrollTop = el.scrollHeight; }, 30);
+}
+async function aiSendChat() {
+  if (aiBusy) return;
+  const input = document.getElementById('aiChatInput');
+  const text = (input ? input.value : '').trim();
+  if (!text && !aiAttachImage) return;
+  if (!aiHasKey()) { showToast('Add an API key in Settings first', 'error'); return; }
+  const image = aiAttachImage;
+  aiChatMessages.push({ role: 'user', text: text || '(image)', image });
+  aiAttachImage = null;
+  aiBusy = true;
+  renderAI(); aiScrollChat();
+  try {
+    const system = "You are a sharp, concise trading and equity-research assistant inside a stock trading journal app for Indian markets (NSE/BSE). Give practical, structured answers. You do not have live fundamental data, so qualify forward-looking claims. Never give it as financial advice guarantees.";
+    const history = aiChatMessages.filter(m => m.text).map(m => ({ role: m.role, text: m.text, image: m.role === 'user' ? m.image : null }));
+    const reply = await callAI(system, history);
+    aiChatMessages.push({ role: 'assistant', text: reply });
+  } catch (err) {
+    aiChatMessages.push({ role: 'assistant', text: '⚠️ ' + err.message });
+  }
+  aiBusy = false;
+  renderAI(); aiScrollChat();
+}
+
+/* ----- Business Analysis (fixed prompt, user supplies symbol) ----- */
+function aiBusinessHTML() {
+  return `
+    ${aiNoKeyBanner()}
+    <p class="section-panel-desc" style="margin-top:0">Enter a stock/company name or symbol. The app sends a standard deep-dive prompt and returns a full business analysis.</p>
+    <div class="ai-input-bar" style="margin-bottom:6px">
+      <input type="text" id="aiBizInput" placeholder="e.g. RELIANCE, HDFC Bank, INFY" onkeydown="if(event.key==='Enter') aiAnalyzeBusiness()">
+      <button class="ai-icon-sm ai-send-btn" onclick="aiAnalyzeBusiness()" title="Analyze">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div id="aiBizResult"></div>`;
+}
+async function aiAnalyzeBusiness() {
+  if (aiBusy) return;
+  const input = document.getElementById('aiBizInput');
+  const symbol = (input ? input.value : '').trim();
+  if (!symbol) return showToast('Enter a stock name', 'error');
+  if (!aiHasKey()) return showToast('Add an API key in Settings first', 'error');
+  const out = document.getElementById('aiBizResult');
+  aiBusy = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Analyzing ${escapeHtml(symbol)}…</div>`;
+  const system = "You are an equity research analyst. Produce a clear, structured business analysis. Use plain text with short headed sections. Be balanced and note you lack live financials.";
+  const prompt = `Give a structured business analysis of ${symbol} (Indian listed company if applicable). Cover, with short headings:
+1. What the business does (segments / revenue mix)
+2. Industry & where it sits in the value chain
+3. Competitive moat & key competitors
+4. Growth drivers / tailwinds
+5. Key risks & headwinds
+6. Bull case (3 bullets)
+7. Bear case (3 bullets)
+8. One-line summary
+
+Keep it tight and practical for a trader/investor. Note that you don't have live financial data.`;
+  try {
+    const reply = await callAI(system, [{ role: 'user', text: prompt }]);
+    out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+}
+
+/* ----- Trade Reviewer & AI Insights (run over journal data) ----- */
+function aiSimpleRunHTML(kind) {
+  const desc = kind === 'reviewer'
+    ? 'Analyzes your closed trades for recurring mistakes, rule violations, position-sizing issues and emotional patterns.'
+    : 'Summarizes your performance: best/worst setups, win-rate by category & tag, rule adherence, and concrete suggestions.';
+  return `
+    ${aiNoKeyBanner()}
+    <p class="section-panel-desc" style="margin-top:0">${desc}</p>
+    <div class="btn-row"><button class="btn" onclick="aiRunJournal('${kind}')">${kind === 'reviewer' ? 'Review my trades' : 'Generate insights'}</button></div>
+    <div id="aiRunResult"></div>`;
+}
+function aiBuildJournalSummary() {
+  const closed = [
+    ...state.trades.filter(t => t.status === 'closed'),
+    ...(state.coreClosed || [])
+  ];
+  if (closed.length === 0) return null;
+  const lines = closed.slice(-60).map(t => {
+    const ruleStr = t.ruleTagsExit ? Object.entries(t.ruleTagsExit).map(([rid, v]) => {
+      const r = (state.rules || []).find(x => x.id === rid); return r ? `${r.name}:${v === 'followed' ? 'Y' : 'N'}` : '';
+    }).filter(Boolean).join(', ') : '';
+    return `${t.symbol} | ${t.category || 'stocks'} | ${(t.tradeName||'').slice(0,30)} | net ₹${Math.round(netPnl(t))} | tags:${(t.tags||[]).join('/')} | rules:${ruleStr}`;
+  }).join('\n');
+  const s = computeStats();
+  return `Total closed: ${closed.length}. Win rate: ${s.winRate.toFixed(0)}%. Total net P&L: ₹${Math.round(s.totalRealized)}.\nRecent trades (symbol | category | setup | net | tags | rules followed):\n${lines}`;
+}
+async function aiRunJournal(kind) {
+  if (aiBusy) return;
+  if (!aiHasKey()) return showToast('Add an API key in Settings first', 'error');
+  const out = document.getElementById('aiRunResult');
+  const summary = aiBuildJournalSummary();
+  if (!summary) { out.innerHTML = `<div class="ai-nokey">No closed trades yet to analyze.</div>`; return; }
+  aiBusy = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Analyzing your journal…</div>`;
+  const system = "You are a trading coach reviewing a trader's journal. Be specific, reference the data, and give actionable feedback. Plain text with short headings.";
+  const ask = kind === 'reviewer'
+    ? `Review these trades. Identify recurring mistakes, rule violations (rules followed are marked Y/N), overtrading, poor sizing, and emotional patterns. End with the top 3 things to fix.\n\n${summary}`
+    : `Analyze this journal. Report: best & worst setups/tags, win-rate observations, whether following rules correlates with better P&L, and 3 concrete suggestions to improve.\n\n${summary}`;
+  try {
+    const reply = await callAI(system, [{ role: 'user', text: ask }]);
+    out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+}
+
+/* ----- Chart Reader (vision) ----- */
+function aiChartHTML() {
+  const isGemini = state.settings.ai.provider === 'gemini';
+  return `
+    ${aiNoKeyBanner()}
+    ${!isGemini ? `<div class="ai-nokey">ℹ️ Chart reading works best with Google Gemini. Your current provider is OpenRouter — switch in Settings if the model doesn't support images.</div>` : ''}
+    <p class="section-panel-desc" style="margin-top:0">Upload a chart screenshot. The AI identifies the symbol (if visible), the pattern, and a suggested entry / stop-loss / target.</p>
+    <div class="drop-zone" id="aiChartDrop">
+      <div><div style="font-size:28px;opacity:0.4;">📈</div><div style="margin-top:6px;font-size:13px;">Click or drag a chart image</div></div>
+      <input type="file" id="aiChartFile" accept="image/*" style="display:none">
+    </div>
+    <div id="aiChartResult"></div>`;
+}
+async function aiReadChart(dataUrl) {
+  const out = document.getElementById('aiChartResult');
+  const drop = document.getElementById('aiChartDrop');
+  if (drop) drop.innerHTML = `<img class="drop-zone-preview" src="${dataUrl}">`;
+  if (!aiHasKey()) { out.innerHTML = `<div class="ai-nokey">Add an API key in Settings first.</div>`; return; }
+  aiBusy = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Reading the chart…</div>`;
+  const system = "You are a technical analyst. Read trading chart screenshots and respond in plain text with short headings.";
+  const prompt = `Look at this trading chart and report:
+1. Symbol & timeframe (if visible)
+2. Trend & key support/resistance
+3. Chart pattern / setup you see
+4. A possible trade idea: entry, stop-loss, target, and rough risk:reward
+Note this is not financial advice.`;
+  try {
+    const reply = await callAI(system, [{ role: 'user', text: prompt, image: dataUrl }]);
+    out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+}
+
+/* ----- Provider API layer ----- */
+async function callAI(systemPrompt, messages) {
+  const ai = state.settings.ai;
+  const provider = ai.provider;
+  const key = ai.keys[provider];
+  const model = ai.models[provider];
+  if (!key) throw new Error('No API key set. Add one in Settings → AI Assistant.');
+  if (provider === 'gemini') return callGemini(systemPrompt, messages, key, model);
+  return callOpenRouter(systemPrompt, messages, key, model);
+}
+function aiStripDataUrl(dataUrl) {
+  const i = dataUrl.indexOf(',');
+  return { mime: (dataUrl.slice(5, dataUrl.indexOf(';')) || 'image/jpeg'), data: dataUrl.slice(i + 1) };
+}
+async function callGemini(systemPrompt, messages, key, model) {
+  const contents = messages.map(m => {
+    const parts = [];
+    if (m.text) parts.push({ text: m.text });
+    if (m.image) { const { mime, data } = aiStripDataUrl(m.image); parts.push({ inline_data: { mime_type: mime, data } }); }
+    return { role: m.role === 'assistant' ? 'model' : 'user', parts };
+  });
+  const body = { contents, systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { temperature: 0.6 } };
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    let msg = `Gemini error ${res.status}`;
+    try { const e = await res.json(); if (e.error && e.error.message) msg = e.error.message; } catch (_) {}
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const cand = data.candidates && data.candidates[0];
+  const text = cand && cand.content && cand.content.parts ? cand.content.parts.map(p => p.text || '').join('') : '';
+  if (!text) throw new Error('Empty response from Gemini (check model name or safety blocks).');
+  return text;
+}
+async function callOpenRouter(systemPrompt, messages, key, model) {
+  const msgs = [{ role: 'system', content: systemPrompt }];
+  messages.forEach(m => {
+    if (m.image) {
+      msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: [
+        ...(m.text ? [{ type: 'text', text: m.text }] : []),
+        { type: 'image_url', image_url: { url: m.image } }
+      ] });
+    } else {
+      msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.text });
+    }
+  });
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'X-Title': 'NazTrades' },
+    body: JSON.stringify({ model, messages: msgs, temperature: 0.6 })
+  });
+  if (!res.ok) {
+    let msg = `OpenRouter error ${res.status}`;
+    try { const e = await res.json(); if (e.error && e.error.message) msg = e.error.message; } catch (_) {}
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const text = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
+  if (!text) throw new Error('Empty response from OpenRouter (model may not support this input).');
+  return text;
 }
 
 /* ========================================================================
