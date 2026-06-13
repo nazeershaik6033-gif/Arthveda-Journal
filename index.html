@@ -3770,30 +3770,41 @@ async function importZerodhaTradebook(event) {
 
     symbols.forEach(g => {
       g.avgBuy = g.buyValue / g.buyQty;
-      g.openQty = g.buyQty - g.sellQty;
+      // Clamp matched sell qty to what was actually bought (handles net-short edge case)
+      g.netSellQty = Math.min(g.sellQty, g.buyQty);
+      g.openQty = g.buyQty - g.netSellQty;
       g.avgSell = g.sellQty > 0 ? g.sellValue / g.sellQty : 0;
+      // P&L on the matched (closed) portion: (avgSell - avgBuy) × netSellQty
+      g.realizedPnl = g.netSellQty > 0 ? ((g.avgSell - g.avgBuy) * g.netSellQty) : null;
       g.status = g.openQty > 0 ? 'open' : 'closed';
       g.assignTo = g.openQty > 0 ? 'core' : 'satellite';
+      // True when some shares were sold but position is still open (partial close)
+      g.hasPartialClose = g.openQty > 0 && g.netSellQty > 0;
     });
 
     showModal({
       title: `Zerodha Import — ${symbols.length} symbol${symbols.length === 1 ? '' : 's'} found`,
       size: 'lg',
       body: `
-        <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 12px;">Review and choose where each symbol goes. Open positions → Core Holdings. Fully closed → Satellite (logged as a closed trade).</p>
+        <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 12px;">Review and choose where each symbol goes. Partial closes create both a core/open entry and a separate closed P&amp;L record.</p>
         <div class="table-wrap">
           <table class="data-table" id="zerodhaTable">
             <thead>
-              <tr><th>Symbol</th><th>Buy Qty</th><th>Avg Buy</th><th>Open Qty</th><th>Status</th><th>Assign To</th></tr>
+              <tr><th>Symbol</th><th>Buy Qty</th><th>Avg Buy</th><th>Sell Qty</th><th>Avg Sell</th><th>Open Qty</th><th>Realized P&amp;L</th><th>Status</th><th>Assign To</th></tr>
             </thead>
             <tbody>
-              ${symbols.map((g, i) => `
+              ${symbols.map((g, i) => {
+                const pnlColor = g.realizedPnl === null ? '' : g.realizedPnl >= 0 ? 'color:var(--success,#22c55e)' : 'color:var(--danger,#ef4444)';
+                return `
                 <tr>
                   <td>${escapeHtml(g.symbol)}</td>
                   <td>${g.buyQty}</td>
                   <td>${formatINR(g.avgBuy)}</td>
+                  <td>${g.netSellQty > 0 ? g.netSellQty : '—'}</td>
+                  <td>${g.avgSell > 0 ? formatINR(g.avgSell) : '—'}</td>
                   <td>${g.openQty}</td>
-                  <td><span class="badge ${g.status === 'open' ? 'warning' : 'success'}">${g.status}</span></td>
+                  <td style="${pnlColor}">${g.realizedPnl !== null ? formatINR(g.realizedPnl) : '—'}</td>
+                  <td><span class="badge ${g.status === 'open' ? 'warning' : 'success'}">${g.hasPartialClose ? 'partial' : g.status}</span></td>
                   <td>
                     <select class="form-select" data-idx="${i}" style="padding: 4px 8px; font-size: 12px;">
                       <option value="core" ${g.assignTo === 'core' ? 'selected' : ''}>Core</option>
@@ -3801,8 +3812,8 @@ async function importZerodhaTradebook(event) {
                       <option value="skip">Skip</option>
                     </select>
                   </td>
-                </tr>
-              `).join('')}
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -3812,41 +3823,94 @@ async function importZerodhaTradebook(event) {
 
     document.getElementById('confirmZerodhaBtn').onclick = async () => {
       let imported = 0;
+      const now = new Date().toISOString();
+
+      const pushClosedTrade = (g) => {
+        state.trades.push({
+          id: generateId(),
+          portfolioType: 'satellite',
+          status: 'closed',
+          category: 'stocks',
+          symbol: g.symbol,
+          tradeName: 'Imported from Zerodha',
+          entryPrice: g.avgBuy,
+          entryQty: g.netSellQty,
+          entryDate: now,
+          entryDesc: 'Auto-imported from Zerodha tradebook',
+          exitPrice: g.avgSell,
+          exitQty: g.netSellQty,
+          exitDate: now,
+          realizedPnl: g.realizedPnl,
+          closedAt: now,
+          tags: ['zerodha-import'],
+          createdAt: now
+        });
+      };
+
       document.querySelectorAll('#zerodhaTable select').forEach(sel => {
         const idx = parseInt(sel.dataset.idx);
         const choice = sel.value;
         const g = symbols[idx];
         if (choice === 'skip') return;
+
         if (choice === 'core') {
+          // Core holding: remaining open shares only
           state.portfolio.push({
             id: generateId(),
             symbol: g.symbol,
             tradeName: 'Imported from Zerodha',
             qty: g.openQty || g.buyQty,
             avgPrice: g.avgBuy,
-            addedAt: new Date().toISOString()
+            addedAt: now
           });
+          // If shares were also sold, record that realized P&L as a closed satellite trade
+          if (g.hasPartialClose) pushClosedTrade(g);
           imported++;
         } else {
-          state.trades.push({
-            id: generateId(),
-            portfolioType: 'satellite',
-            status: g.openQty > 0 ? 'open' : 'closed',
-            category: 'stocks',
-            symbol: g.symbol,
-            tradeName: 'Imported from Zerodha',
-            entryPrice: g.avgBuy,
-            entryQty: g.buyQty,
-            entryDate: new Date().toISOString(),
-            entryDesc: 'Auto-imported from Zerodha tradebook',
-            exitPrice: g.openQty > 0 ? null : g.avgSell,
-            exitQty: g.openQty > 0 ? null : g.sellQty,
-            exitDate: g.openQty > 0 ? null : new Date().toISOString(),
-            realizedPnl: g.openQty > 0 ? null : (g.sellValue - g.buyValue),
-            closedAt: g.openQty > 0 ? null : new Date().toISOString(),
-            tags: ['zerodha-import'],
-            createdAt: new Date().toISOString()
-          });
+          if (g.hasPartialClose) {
+            // Partially closed: open satellite for remaining shares + closed record for sold portion
+            state.trades.push({
+              id: generateId(),
+              portfolioType: 'satellite',
+              status: 'open',
+              category: 'stocks',
+              symbol: g.symbol,
+              tradeName: 'Imported from Zerodha',
+              entryPrice: g.avgBuy,
+              entryQty: g.openQty,
+              entryDate: now,
+              entryDesc: 'Auto-imported from Zerodha tradebook',
+              exitPrice: null,
+              exitQty: null,
+              exitDate: null,
+              realizedPnl: null,
+              closedAt: null,
+              tags: ['zerodha-import'],
+              createdAt: now
+            });
+            pushClosedTrade(g);
+          } else {
+            // Fully closed or fully open satellite trade
+            state.trades.push({
+              id: generateId(),
+              portfolioType: 'satellite',
+              status: g.openQty > 0 ? 'open' : 'closed',
+              category: 'stocks',
+              symbol: g.symbol,
+              tradeName: 'Imported from Zerodha',
+              entryPrice: g.avgBuy,
+              entryQty: g.openQty > 0 ? g.openQty : g.netSellQty,
+              entryDate: now,
+              entryDesc: 'Auto-imported from Zerodha tradebook',
+              exitPrice: g.openQty > 0 ? null : g.avgSell,
+              exitQty: g.openQty > 0 ? null : g.netSellQty,
+              exitDate: g.openQty > 0 ? null : now,
+              realizedPnl: g.openQty > 0 ? null : g.realizedPnl,
+              closedAt: g.openQty > 0 ? null : now,
+              tags: ['zerodha-import'],
+              createdAt: now
+            });
+          }
           imported++;
         }
       });
