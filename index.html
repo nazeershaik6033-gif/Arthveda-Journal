@@ -465,22 +465,33 @@ html.light .brand-logo {
 .tab-panel { display: none; animation: fadeUp 0.3s ease-out; }
 .tab-panel.active { display: block; }
 
-/* Embedded Reader (Instapaper) — breaks out of the container padding to fill
-   the viewport; fully isolated inside its own iframe. */
+/* Embedded Reader (Instapaper) — runs standalone full-screen, fully isolated
+   inside its own iframe. */
 #panel-reader.active { animation: fadeIn 0.25s ease-out; }
-.reader-embed {
-  margin: -18px -16px -110px;
-  background: #1c1c1e;
-}
-@media (max-width: 768px) {
-  .reader-embed { margin: -16px -12px -100px; }
-}
 .reader-frame {
   display: block;
   width: 100%;
   border: 0;
   background: #1c1c1e;
 }
+/* While the Reader is open, Instapaper takes over the whole viewport: the
+   journal's header, market banner, bottom dock and FAB are hidden, and the
+   iframe is pinned to fill the screen. The journal state is untouched. */
+body.reader-active { overflow: hidden; }
+body.reader-active .header,
+body.reader-active .market-banner,
+body.reader-active .bottom-dock,
+body.reader-active #fabBtn,
+body.reader-active .drawer,
+body.reader-active .drawer-overlay { display: none !important; }
+body.reader-active .container { max-width: none; padding: 0; }
+body.reader-active #panel-reader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #1c1c1e;
+}
+body.reader-active .reader-frame { height: 100dvh; }
 
 /* Page header */
 .page-header {
@@ -2212,6 +2223,9 @@ function switchTab(tabId) {
   // Hide the FAB while on the entry screen (it's redundant there)
   const fab = document.getElementById('fabBtn');
   if (fab) fab.style.display = (tabId === 'entry' || tabId === 'reader') ? 'none' : 'flex';
+  // Reader runs standalone full-screen: hide the journal's header, banner and
+  // dock so Instapaper takes over the whole viewport.
+  document.body.classList.toggle('reader-active', tabId === 'reader');
   renderActivePanel();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -2329,15 +2343,19 @@ function renderReader() {
 function sizeReaderFrame() {
   const frame = document.getElementById('readerFrame');
   if (!frame || activeTab !== 'reader') return;
-  const top = frame.getBoundingClientRect().top;
-  const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  const dock = isMobile ? 64 : 0; // bottom dock height on mobile
-  const h = Math.max(360, window.innerHeight - top - dock);
-  frame.style.height = h + 'px';
+  // Standalone full-screen: the frame is fixed at the top, so fill the viewport.
+  frame.style.height = window.innerHeight + 'px';
 }
 
 window.addEventListener('resize', sizeReaderFrame);
 window.addEventListener('orientationchange', () => setTimeout(sizeReaderFrame, 150));
+
+// The embedded Instapaper posts this when its in-app Back arrow is tapped —
+// return to the journal's home and restore the normal chrome.
+window.addEventListener('message', (e) => {
+  const d = e.data;
+  if (d && d.type === 'arthveda-reader-back') switchTab('dashboard');
+});
 
 /* ========================================================================
    MARKET STATUS

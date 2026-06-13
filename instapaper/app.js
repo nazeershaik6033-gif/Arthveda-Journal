@@ -7,6 +7,10 @@ const h=(t,p,...c)=>ce(t,p,...c);
 /* ============================== constants ============================== */
 const STORE_KEY='instapaper_v1';
 const APP_VERSION='1.0.0';
+/* True when running inside the Naz Trades journal (embedded in an iframe).
+   In that case the header shows a Back arrow that returns to the journal. */
+const EMBEDDED=(()=>{try{return window.self!==window.parent}catch(e){return true}})();
+const exitToHost=()=>{try{window.parent.postMessage({type:'arthveda-reader-back'},'*')}catch(e){}};
 
 const THEMES={
   light:{id:'light',label:'Light',bg:'#ffffff',fg:'#1c1c1e',sub:'#9a9aa0',meta:'#76767c',hair:'#e8e8ec',card:'#f4f4f6',search:'#efeff1',sheet:'#ffffff',overlay:'rgba(0,0,0,.42)',menuBg:'#ffffff',menuFg:'#1c1c1e',menuHair:'#ececef',accent:'#3478c6',danger:'#d0342c',hl:'rgba(255,222,60,.5)',thumbBg:'#ececee',statusbar:'#ffffff',swatch:'#ffffff'},
@@ -2264,6 +2268,7 @@ function App(){
       h('div',{style:{width:70}}));
   }else{
     header=h('div',{style:{display:'flex',alignItems:'center',padding:'6px 8px',flexShrink:0,position:'relative'}},
+      EMBEDDED?h('button',{onClick:exitToHost,className:'act90 trt','aria-label':'Back to Naz Trades',title:'Back to Naz Trades',style:Object.assign({},iconBtnS,{color:T.fg})},Icons.back(23)):null,
       headerBtn(scope.type==='tag'?Icons.back(23):Icons.menu(23),()=>scope.type==='tag'?setScope({type:'tags'}):setSidebar(true)),
       h('button',{onClick:goHome,className:'act90','aria-label':'Go to top of Home',style:{marginLeft:2,padding:'2px 6px',textAlign:'left',fontFamily:WORDMARK,fontSize:21,fontWeight:600,letterSpacing:'.2px',color:T.fg,background:'none',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'52%'}},scopeTitle(scope,data.folders)),
       h('div',{style:{flex:1}}),
