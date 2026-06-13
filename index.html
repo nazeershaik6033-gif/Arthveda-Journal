@@ -3780,12 +3780,20 @@ async function importZerodhaTradebook(event) {
       g.assignTo = g.openQty > 0 ? 'core' : 'satellite';
       // True when some shares were sold but position is still open (partial close)
       g.hasPartialClose = g.openQty > 0 && g.netSellQty > 0;
+      // Detect if symbol already exists in portfolio or open trades
+      g.existingPortfolio = (state.portfolio || []).find(p => p.symbol === g.symbol.toUpperCase() || p.symbol === g.symbol);
+      g.existingTrade = (state.trades || []).find(t => t.status === 'open' && (t.symbol === g.symbol.toUpperCase() || t.symbol === g.symbol));
+      g.isDuplicate = !!(g.existingPortfolio || g.existingTrade);
+      // Default duplicates to skip to prevent accidental double-entries
+      if (g.isDuplicate) g.assignTo = 'skip';
     });
 
+    const dupCount = symbols.filter(g => g.isDuplicate).length;
     showModal({
       title: `Zerodha Import — ${symbols.length} symbol${symbols.length === 1 ? '' : 's'} found`,
       size: 'lg',
       body: `
+        ${dupCount > 0 ? `<p style="color:var(--warning,#f59e0b);font-size:13px;margin:0 0 10px;padding:8px 10px;background:rgba(245,158,11,.1);border-radius:6px;">⚠️ ${dupCount} symbol${dupCount > 1 ? 's' : ''} already exist in your portfolio/trades and are set to <strong>Skip</strong> by default. Choose <em>Update existing</em> to merge tradebook data into the existing entry instead of creating a duplicate.</p>` : ''}
         <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 12px;">Review and choose where each symbol goes. Partial closes create both a core/open entry and a separate closed P&amp;L record.</p>
         <div class="table-wrap">
           <table class="data-table" id="zerodhaTable">
@@ -3795,9 +3803,11 @@ async function importZerodhaTradebook(event) {
             <tbody>
               ${symbols.map((g, i) => {
                 const pnlColor = g.realizedPnl === null ? '' : g.realizedPnl >= 0 ? 'color:var(--success,#22c55e)' : 'color:var(--danger,#ef4444)';
+                const rowStyle = g.isDuplicate ? 'opacity:0.7' : '';
+                const dupBadge = g.isDuplicate ? ' <span class="badge" style="background:var(--warning,#f59e0b);color:#000;font-size:10px;vertical-align:middle;">exists</span>' : '';
                 return `
-                <tr>
-                  <td>${escapeHtml(g.symbol)}</td>
+                <tr style="${rowStyle}">
+                  <td>${escapeHtml(g.symbol)}${dupBadge}</td>
                   <td>${g.buyQty}</td>
                   <td>${formatINR(g.avgBuy)}</td>
                   <td>${g.netSellQty > 0 ? g.netSellQty : '—'}</td>
@@ -3807,9 +3817,10 @@ async function importZerodhaTradebook(event) {
                   <td><span class="badge ${g.status === 'open' ? 'warning' : 'success'}">${g.hasPartialClose ? 'partial' : g.status}</span></td>
                   <td>
                     <select class="form-select" data-idx="${i}" style="padding: 4px 8px; font-size: 12px;">
-                      <option value="core" ${g.assignTo === 'core' ? 'selected' : ''}>Core</option>
-                      <option value="satellite" ${g.assignTo === 'satellite' ? 'selected' : ''}>Satellite</option>
-                      <option value="skip">Skip</option>
+                      <option value="core" ${g.assignTo === 'core' ? 'selected' : ''}>Core (new)</option>
+                      <option value="satellite" ${g.assignTo === 'satellite' ? 'selected' : ''}>Satellite (new)</option>
+                      ${g.isDuplicate ? `<option value="update" ${g.assignTo === 'update' ? 'selected' : ''}>Update existing</option>` : ''}
+                      <option value="skip" ${g.assignTo === 'skip' ? 'selected' : ''}>Skip</option>
                     </select>
                   </td>
                 </tr>`;
@@ -3853,7 +3864,25 @@ async function importZerodhaTradebook(event) {
         const g = symbols[idx];
         if (choice === 'skip') return;
 
-        if (choice === 'core') {
+        if (choice === 'update') {
+          // Merge tradebook data into the existing portfolio or open trade entry
+          if (g.existingPortfolio) {
+            const ep = g.existingPortfolio;
+            const totalQty = Number(ep.qty) + (g.openQty || g.buyQty);
+            const totalValue = Number(ep.qty) * Number(ep.avgPrice) + (g.openQty || g.buyQty) * g.avgBuy;
+            ep.qty = totalQty;
+            ep.avgPrice = totalQty > 0 ? totalValue / totalQty : g.avgBuy;
+          } else if (g.existingTrade) {
+            const et = g.existingTrade;
+            const totalQty = Number(et.entryQty) + (g.openQty || g.buyQty);
+            const totalValue = Number(et.entryQty) * Number(et.entryPrice) + (g.openQty || g.buyQty) * g.avgBuy;
+            et.entryQty = totalQty;
+            et.entryPrice = totalQty > 0 ? totalValue / totalQty : g.avgBuy;
+          }
+          // Still capture any realized P&L from sells even on an update
+          if (g.hasPartialClose || g.netSellQty > 0) pushClosedTrade(g);
+          imported++;
+        } else if (choice === 'core') {
           // Core holding: remaining open shares only
           state.portfolio.push({
             id: generateId(),
