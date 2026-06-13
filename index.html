@@ -2338,8 +2338,8 @@ function renderReader() {
     panel.innerHTML =
       '<div class="reader-embed">' +
         '<iframe class="reader-frame" id="readerFrame" title="Instapaper Reader" ' +
-        'src="instapaper/index.html" allow="clipboard-read; clipboard-write; fullscreen" ' +
-        'referrerpolicy="no-referrer"></iframe>' +
+        'src="instapaper/index.html" ' +
+        'allow="clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media; picture-in-picture; accelerometer; gyroscope"></iframe>' +
       '</div>';
     panel.dataset.loaded = '1';
   }
