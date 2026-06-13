@@ -206,13 +206,24 @@ input[type=range].font-slider::-moz-range-thumb {
   border-bottom: 1px solid var(--border-subtle);
 }
 .header-inner {
-  max-width: 1400px;
+  max-width: 520px;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  gap: 16px;
+  padding: 12px 16px;
+  gap: 12px;
+}
+.header-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .brand {
   display: flex;
@@ -320,14 +331,14 @@ input[type=range].font-slider::-moz-range-thumb {
   font-family: var(--font-mono);
 }
 
-/* Layout */
+/* Layout — mobile-first centered column */
 .container {
-  max-width: 1400px;
+  max-width: 520px;
   margin: 0 auto;
-  padding: 24px 20px 100px;
+  padding: 18px 16px 110px;
 }
 @media (max-width: 768px) {
-  .container { padding: 16px 12px 90px; }
+  .container { padding: 16px 12px 100px; }
 }
 
 /* Tab panel */
@@ -786,43 +797,256 @@ input[type=range].font-slider::-moz-range-thumb {
 
 /* Bottom dock */
 .bottom-dock {
-  display: none;
+  display: flex;
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(10, 17, 32, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  margin: 0 auto;
+  max-width: 520px;
+  background: rgba(10, 17, 32, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-top: 1px solid var(--border-subtle);
+  border-radius: 18px 18px 0 0;
   z-index: 50;
-  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
   justify-content: space-around;
 }
 .dock-btn {
   background: transparent;
   border: none;
-  color: var(--text-muted);
-  padding: 6px 8px;
-  border-radius: 8px;
+  color: var(--text-subtle);
+  padding: 4px 8px;
+  border-radius: 12px;
   cursor: pointer;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   transition: color 0.15s ease;
   flex: 1;
-  max-width: 80px;
+  max-width: 90px;
 }
-.dock-btn .dock-icon { font-size: 18px; line-height: 1; }
+.dock-btn .dock-icon { display: flex; align-items: center; justify-content: center; }
+.dock-btn .dock-icon svg { width: 22px; height: 22px; }
 .dock-btn.active { color: var(--primary); }
-@media (max-width: 768px) {
-  .bottom-dock { display: flex; }
-  .tabs-bar { display: none; }
+.tabs-bar { display: none; }
+
+/* Floating action button */
+.fab {
+  position: fixed;
+  right: max(18px, calc(50% - 260px + 18px));
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 55;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
+.fab:hover { background: var(--primary-hover); transform: translateY(-2px); }
+.fab:active { transform: scale(0.94); }
+
+/* Sidebar drawer */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 270px;
+  max-width: 82vw;
+  background: var(--surface-1);
+  border-right: 1px solid var(--border);
+  z-index: 61;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.drawer-nav { padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+.drawer-item:hover { background: var(--surface-2); color: var(--text); }
+.drawer-item.active { background: var(--primary-muted); color: var(--primary); }
+.drawer-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* Segmented control (timeframe / journal views) */
+.seg {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg.full { display: flex; width: 100%; }
+.seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.seg-btn.active { background: var(--primary); color: #fff; }
+
+/* Dashboard donut */
+.donut-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 8px 0 4px;
+}
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.donut-center .dc-label { color: var(--text-muted); font-size: 13px; margin-bottom: 4px; }
+.donut-center .dc-value { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* Metric cards row */
+.metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.metric {
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: center;
+}
+.metric .m-label { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; }
+.metric .m-value { font-size: 18px; font-weight: 700; }
+.metric .m-sub { font-size: 10px; color: var(--text-subtle); margin-top: 2px; }
+
+/* Journal day/month cards */
+.jcard {
+  display: flex;
+  gap: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.jcard-date { flex-shrink: 0; width: 44px; text-align: center; }
+.jcard-date .jd-day { font-size: 26px; font-weight: 800; line-height: 1; }
+.jcard-date .jd-dow { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.jcard-body { flex: 1; min-width: 0; }
+.jcard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.jcard-grid .jg-row { display: flex; justify-content: space-between; }
+.jcard-grid .jg-row span:first-child { color: var(--text-muted); }
+.jcard-grid .jg-row span:last-child { font-weight: 600; }
+.pill-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: #fff;
+}
+.pill.win { background: var(--success); }
+.pill.loss { background: var(--error); }
+.jcard-actions { display: flex; gap: 8px; }
+.jspark { width: 100%; height: 70px; display: block; }
+
+/* Journal calendar grid (7 days + week column) */
+.jcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr) 1.1fr;
+  gap: 4px;
+}
+.jcal-h {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 4px 0;
+}
+.jcal-cell {
+  min-height: 52px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.jcal-cell.empty { background: transparent; border: none; }
+.jcal-cell.pos { background: var(--success-bg); border-color: var(--success-border); }
+.jcal-cell.neg { background: var(--error-bg); border-color: var(--error-border); }
+.jcal-cell.wk { background: var(--surface-3); }
+.jcal-cell.today { outline: 2px solid var(--primary); }
+.jcal-num { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+.jcal-pnl { font-size: 10px; font-weight: 700; margin-top: 2px; font-family: var(--font-mono); }
+.jcal-cell.pos .jcal-pnl { color: var(--success); }
+.jcal-cell.neg .jcal-pnl { color: var(--error); }
+.jcal-cnt { font-size: 8px; color: var(--text-subtle); }
 
 /* Sub tabs */
 .sub-tabs {
@@ -1081,36 +1305,16 @@ table.data-table tr:last-child td { border-bottom: none; }
 <!-- HEADER -->
 <header class="header">
   <div class="header-inner">
-    <div class="brand">
-      <div class="brand-logo">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Black notebook cover -->
-          <rect x="4" y="3" width="20" height="26" rx="2" fill="#000" stroke="#fff" stroke-width="1"/>
-          <!-- Spiral binding -->
-          <circle cx="6.5" cy="6" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="10" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="14" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="18" r="1" fill="#fff"/>
-          <circle cx="6.5" cy="22" r="1" fill="#fff"/>
-          <!-- White text on black -->
-          <text x="14" y="13" font-size="7" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="middle">Trading</text>
-          <text x="14" y="19" font-size="6" font-weight="600" fill="#fff" text-anchor="middle" dominant-baseline="middle">Journal</text>
-        </svg>
-      </div>
-      <span>Naz Trades</span>
-    </div>
-    <div class="tabs-bar" id="tabsBar"></div>
+    <button class="icon-btn" id="menuBtn" title="Menu" aria-label="Open menu">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <h1 class="header-title" id="headerTitle">Dashboard</h1>
     <div class="header-actions">
       <button class="icon-btn" id="searchBtn" title="Search" aria-label="Search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
       </button>
-      <button class="icon-btn" id="quickAddBtn" title="Add Trade" aria-label="Add Trade">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-      </button>
       <button class="icon-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle theme">
-        <!-- sun icon (shown in dark mode) -->
         <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-        <!-- moon icon (shown in light mode) -->
         <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
     </div>
@@ -1125,10 +1329,33 @@ table.data-table tr:last-child td { border-bottom: none; }
   </div>
 </header>
 
+<!-- SIDEBAR DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="3" width="20" height="26" rx="2" fill="#000" stroke="#fff" stroke-width="1"/>
+          <circle cx="6.5" cy="6" r="1" fill="#fff"/><circle cx="6.5" cy="10" r="1" fill="#fff"/><circle cx="6.5" cy="14" r="1" fill="#fff"/><circle cx="6.5" cy="18" r="1" fill="#fff"/><circle cx="6.5" cy="22" r="1" fill="#fff"/>
+          <text x="14" y="13" font-size="7" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="middle">Trading</text>
+          <text x="14" y="19" font-size="6" font-weight="600" fill="#fff" text-anchor="middle" dominant-baseline="middle">Journal</text>
+        </svg>
+      </div>
+      <span>Naz Trades</span>
+    </div>
+    <button class="icon-btn" id="drawerCloseBtn" aria-label="Close menu">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <nav class="drawer-nav" id="drawerNav"></nav>
+</aside>
+
 <!-- MAIN -->
 <main class="container" id="mainContainer">
   <div class="tab-panel" id="panel-dashboard"></div>
   <div class="tab-panel" id="panel-trades"></div>
+  <div class="tab-panel" id="panel-journal"></div>
   <div class="tab-panel" id="panel-entry"></div>
   <div class="tab-panel" id="panel-priority"></div>
   <div class="tab-panel" id="panel-watchlist"></div>
@@ -1137,6 +1364,11 @@ table.data-table tr:last-child td { border-bottom: none; }
   <div class="tab-panel" id="panel-strategy"></div>
   <div class="tab-panel" id="panel-settings"></div>
 </main>
+
+<!-- FLOATING ACTION BUTTON -->
+<button class="fab" id="fabBtn" title="New Trade" aria-label="Add new trade">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+</button>
 
 <!-- BOTTOM DOCK -->
 <nav class="bottom-dock" id="bottomDock"></nav>
@@ -1153,19 +1385,21 @@ table.data-table tr:last-child td { border-bottom: none; }
    ======================================================================== */
 
 // ---- TABS CONFIG ----
+// group: 'dock' = bottom nav, 'menu' = sidebar drawer, 'fab' = floating + button
 const TABS = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'home', dock: true },
-  { id: 'trades',    label: 'Trades',    icon: 'list', dock: true },
-  { id: 'entry',     label: 'Entry',     icon: 'plus', dock: true },
-  { id: 'priority',  label: 'Priority',  icon: 'star', dock: false },
-  { id: 'watchlist', label: 'Watchlist', icon: 'eye',  dock: false },
-  { id: 'calendar',  label: 'Calendar',  icon: 'cal',  dock: false },
-  { id: 'analytics', label: 'Analytics', icon: 'bar',  dock: true },
-  { id: 'strategy',  label: 'Strategy',  icon: 'book', dock: false },
-  { id: 'settings',  label: 'Settings',  icon: 'cog',  dock: true },
+  { id: 'dashboard', label: 'Dashboard',  icon: 'home', group: 'dock' },
+  { id: 'trades',    label: 'Trades',     icon: 'list', group: 'dock' },
+  { id: 'journal',   label: 'My Journal', icon: 'book', group: 'dock' },
+  { id: 'analytics', label: 'Analytics',  icon: 'bar',  group: 'dock' },
+  { id: 'entry',     label: 'New Trade',  icon: 'plus', group: 'fab' },
+  { id: 'priority',  label: 'Setups',     icon: 'star', group: 'menu' },
+  { id: 'watchlist', label: 'Watchlist',  icon: 'eye',  group: 'menu' },
+  { id: 'strategy',  label: 'Strategy',   icon: 'book', group: 'menu' },
+  { id: 'settings',  label: 'Settings',   icon: 'cog',  group: 'menu' },
 ];
 
 const ICONS = {
+  menu: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
   home: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
   list: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
   plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
@@ -1186,6 +1420,7 @@ const DEFAULT_STATE = {
   priority: [],
   watchlists: [{ id: 'w1', name: 'Default', symbols: [] }],
   strategies: [],
+  journalNotes: {},
   settings: {
     exchange: 'NSE',
     autoRefresh: false,
@@ -1194,7 +1429,9 @@ const DEFAULT_STATE = {
     textFont: 'Inter',
     textSize: 14,
     numFont: 'JetBrains Mono',
-    numSize: 13
+    numSize: 13,
+    trackCommission: true,
+    commissionRate: 0.0005
   }
 };
 
@@ -1204,6 +1441,8 @@ let activeSubTab = { trades: 'satellite-open', wl: 'w1' };
 let tradeFilter = { tag: null, sort: { key: 'date', dir: 'desc' } };
 let calendarMonth = new Date();
 let calendarFilter = 'all';
+let journalView = 'daily';        // daily | monthly | calendar
+let dashboardRange = 'all';       // 1w | 1m | ytd | all
 window.livePrices = {};
 let refreshTimer = null;
 
@@ -1279,6 +1518,7 @@ function normalizeState(s) {
   if (Array.isArray(s.priority)) merged.priority = s.priority;
   if (Array.isArray(s.watchlists) && s.watchlists.length) merged.watchlists = s.watchlists;
   if (Array.isArray(s.strategies)) merged.strategies = s.strategies;
+  if (s.journalNotes && typeof s.journalNotes === 'object') merged.journalNotes = s.journalNotes;
   if (s.settings && typeof s.settings === 'object') merged.settings = { ...merged.settings, ...s.settings };
   // Ensure trades have tags arrays
   merged.trades.forEach(t => { if (!Array.isArray(t.tags)) t.tags = []; });
@@ -1310,6 +1550,45 @@ function formatPnl(n) {
 function pnlClass(n) {
   if (n === null || n === undefined || isNaN(n)) return 'pnl-neutral';
   return Number(n) > 0 ? 'pnl-positive' : (Number(n) < 0 ? 'pnl-negative' : 'pnl-neutral');
+}
+
+// Commission for a single buy+sell turnover, using the configured rate.
+function estimateCommission(turnover) {
+  if (!state.settings.trackCommission) return 0;
+  const rate = Number(state.settings.commissionRate) || 0;
+  return Math.max(0, Math.abs(Number(turnover) || 0) * rate);
+}
+
+// Net realized P&L for a closed trade = gross realized P&L minus commission.
+function netPnl(t) {
+  if (!t) return 0;
+  const gross = Number(t.realizedPnl) || 0;
+  const comm = Number(t.commission) || 0;
+  return gross - comm;
+}
+
+// Percentage return of a closed trade relative to entry cost.
+function tradeGainPct(t) {
+  if (!t) return null;
+  const cost = Math.abs(Number(t.entryPrice) * Number(t.exitQty || t.entryQty));
+  if (!cost) return null;
+  return (netPnl(t) / cost) * 100;
+}
+
+// Local YYYY-MM-DD key for a date/iso (used to group journal entries by day).
+function dayKey(d) {
+  const dt = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+}
+
+// All closed records (satellite + core) that carry a closedAt timestamp.
+function allClosedTrades() {
+  return [
+    ...state.trades.filter(t => t.status === 'closed' && t.closedAt),
+    ...(state.coreClosed || []).filter(t => t.closedAt)
+  ];
 }
 
 function formatDate(iso, opts) {
@@ -1434,23 +1713,25 @@ function showConfirm(title, message, onConfirm, confirmLabel = 'Confirm', confir
    TAB NAVIGATION
    ======================================================================== */
 function renderTabs() {
-  const bar = document.getElementById('tabsBar');
-  bar.innerHTML = TABS.map(t =>
-    `<button class="tab-btn" data-tab="${t.id}">${ICONS[t.icon] || ''}<span>${t.label}</span></button>`
-  ).join('');
-  bar.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.onclick = () => switchTab(btn.dataset.tab);
-  });
-
+  // Bottom dock — primary 4 tabs
   const dock = document.getElementById('bottomDock');
-  const dockTabs = TABS.filter(t => t.dock).slice(0, 5);
+  const dockTabs = TABS.filter(t => t.group === 'dock');
   dock.innerHTML = dockTabs.map(t =>
     `<button class="dock-btn" data-tab="${t.id}"><span class="dock-icon">${ICONS[t.icon] || ''}</span><span>${t.label}</span></button>`
-  ).join('') + `<button class="dock-btn" id="dockMore"><span class="dock-icon">⋯</span><span>More</span></button>`;
+  ).join('');
   dock.querySelectorAll('.dock-btn[data-tab]').forEach(btn => {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
-  document.getElementById('dockMore').onclick = showMoreTabs;
+
+  // Sidebar drawer — secondary items
+  const nav = document.getElementById('drawerNav');
+  const menuTabs = TABS.filter(t => t.group === 'menu');
+  nav.innerHTML = menuTabs.map(t =>
+    `<button class="drawer-item" data-tab="${t.id}">${ICONS[t.icon] || ''}<span>${t.label}</span></button>`
+  ).join('');
+  nav.querySelectorAll('.drawer-item').forEach(btn => {
+    btn.onclick = () => { closeDrawer(); switchTab(btn.dataset.tab); };
+  });
 }
 
 function switchTab(tabId) {
@@ -1458,24 +1739,32 @@ function switchTab(tabId) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById(`panel-${tabId}`);
   if (panel) panel.classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.dock-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.drawer-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  const tab = TABS.find(t => t.id === tabId);
+  const titleEl = document.getElementById('headerTitle');
+  if (titleEl && tab) titleEl.textContent = tab.label;
+  // Hide the FAB while on the entry screen (it's redundant there)
+  const fab = document.getElementById('fabBtn');
+  if (fab) fab.style.display = (tabId === 'entry') ? 'none' : 'flex';
   renderActivePanel();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function showMoreTabs() {
-  const otherTabs = TABS.filter(t => !t.dock);
-  const body = otherTabs.map(t =>
-    `<button class="btn btn-secondary btn-block" style="margin-bottom: 8px;" onclick="closeModal(); switchTab('${t.id}')">${ICONS[t.icon] || ''} ${t.label}</button>`
-  ).join('');
-  showModal({ title: 'More', body });
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
 }
 
 function renderActivePanel() {
   switch (activeTab) {
     case 'dashboard': renderDashboard(); break;
     case 'trades':    renderTrades(); break;
+    case 'journal':   renderJournal(); break;
     case 'entry':     renderEntry(); break;
     case 'priority':  renderPriority(); break;
     case 'watchlist': renderWatchlist(); break;
@@ -1613,12 +1902,12 @@ function computeStats() {
   const coreClosed = (state.coreClosed || []);
   const closed = [...satelliteClosed, ...coreClosed];  // combined for analytics
   const open = state.trades.filter(t => t.status === 'open');
-  const totalRealized = closed.reduce((s, t) => s + (Number(t.realizedPnl) || 0), 0);
-  const wins = closed.filter(t => (Number(t.realizedPnl) || 0) > 0);
-  const losses = closed.filter(t => (Number(t.realizedPnl) || 0) < 0);
+  const totalRealized = closed.reduce((s, t) => s + netPnl(t), 0);
+  const wins = closed.filter(t => netPnl(t) > 0);
+  const losses = closed.filter(t => netPnl(t) < 0);
   const winRate = closed.length ? (wins.length / closed.length) * 100 : 0;
-  const best = closed.reduce((b, t) => (Number(t.realizedPnl) || 0) > (Number(b?.realizedPnl) || -Infinity) ? t : b, null);
-  const worst = closed.reduce((w, t) => (Number(t.realizedPnl) || 0) < (Number(w?.realizedPnl) || Infinity) ? t : w, null);
+  const best = closed.reduce((b, t) => netPnl(t) > (b ? netPnl(b) : -Infinity) ? t : b, null);
+  const worst = closed.reduce((w, t) => netPnl(t) < (w ? netPnl(w) : Infinity) ? t : w, null);
   const avgPnl = closed.length ? totalRealized / closed.length : 0;
   return { closed, satelliteClosed, open, totalRealized, winRate, wins, losses, best, worst, avgPnl };
 }
@@ -1626,84 +1915,377 @@ function computeStats() {
 /* ========================================================================
    DASHBOARD
    ======================================================================== */
+function rangeStart(range) {
+  const now = new Date();
+  if (range === '1w') return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  if (range === '1m') return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+  if (range === 'ytd') return new Date(now.getFullYear(), 0, 1);
+  return null; // all
+}
+
+// Closed trades within the selected dashboard range.
+function closedInRange(range) {
+  const start = rangeStart(range);
+  return allClosedTrades().filter(t => {
+    if (!start) return true;
+    return new Date(t.closedAt) >= start;
+  });
+}
+
+// SVG donut: green arc = winning $, red arc = losing $, sized proportionally.
+function donutSVG(winSum, lossSum) {
+  const size = 200, stroke = 22, r = (size - stroke) / 2, cx = size / 2, cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  const total = winSum + lossSum;
+  const winFrac = total > 0 ? winSum / total : 0;
+  const gap = total > 0 ? 0.012 : 0; // small visual gap between arcs
+  const winLen = total > 0 ? Math.max(0, (winFrac - gap)) * circ : 0;
+  const lossLen = total > 0 ? Math.max(0, (1 - winFrac - gap)) * circ : 0;
+  const track = total > 0 ? '' : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface-4)" stroke-width="${stroke}"/>`;
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform: rotate(-90deg);">
+      ${track}
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--success)" stroke-width="${stroke}" stroke-linecap="round"
+        stroke-dasharray="${winLen} ${circ - winLen}" stroke-dashoffset="0"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--error)" stroke-width="${stroke}" stroke-linecap="round"
+        stroke-dasharray="${lossLen} ${circ - lossLen}" stroke-dashoffset="${-(winFrac) * circ}"/>
+    </svg>`;
+}
+
 function renderDashboard() {
-  const s = computeStats();
-  const recentClosed = [...s.closed].sort((a, b) => new Date(b.closedAt || 0) - new Date(a.closedAt || 0)).slice(0, 5);
-  const recentOpen = [...s.open].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5);
+  const ranges = [['1w','1W'],['1m','1M'],['ytd','YTD'],['all','All']];
+  const closed = closedInRange(dashboardRange);
+  const totalNet = closed.reduce((s, t) => s + netPnl(t), 0);
+  const winSum = closed.reduce((s, t) => s + Math.max(0, netPnl(t)), 0);
+  const lossSum = closed.reduce((s, t) => s + Math.max(0, -netPnl(t)), 0);
+  const wins = closed.filter(t => netPnl(t) > 0);
+  const losses = closed.filter(t => netPnl(t) < 0);
+  const winRate = closed.length ? (wins.length / closed.length) * 100 : 0;
+  const gainPcts = closed.map(tradeGainPct).filter(v => v !== null);
+  const avgGain = gainPcts.length ? gainPcts.reduce((a, b) => a + b, 0) / gainPcts.length : 0;
+
+  const latest = [...closed].sort((a, b) => new Date(b.closedAt || 0) - new Date(a.closedAt || 0)).slice(0, 6);
 
   document.getElementById('panel-dashboard').innerHTML = `
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">Dashboard</h1>
-        <p class="page-subtitle">Your trading at a glance</p>
+    <div class="seg full" style="margin-bottom: 16px;">
+      ${ranges.map(([v, l]) => `<button class="seg-btn ${dashboardRange === v ? 'active' : ''}" onclick="setDashboardRange('${v}')">${l}</button>`).join('')}
+    </div>
+
+    <div class="card" style="padding: 18px;">
+      <div class="donut-wrap">
+        ${donutSVG(winSum, lossSum)}
+        <div class="donut-center">
+          <div class="dc-label">${dashboardRange === 'all' ? 'All-time' : dashboardRange.toUpperCase()} Profit</div>
+          <div class="dc-value ${pnlClass(totalNet)}">${formatPnl(totalNet)}</div>
+          <div style="font-size: 11px; color: var(--text-subtle); margin-top: 4px;">${closed.length} trade${closed.length === 1 ? '' : 's'}</div>
+        </div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-secondary btn-sm" onclick="refreshAllPrices()">Refresh Prices</button>
-        <button class="btn btn-sm" onclick="switchTab('entry')">+ New Trade</button>
+      <div class="metric-row" style="margin-top: 8px;">
+        <div class="metric">
+          <div class="m-label">Profit</div>
+          <div class="m-value ${pnlClass(totalNet)}">${formatPnl(totalNet)}</div>
+          <div class="m-sub">net of fees</div>
+        </div>
+        <div class="metric">
+          <div class="m-label">Win %</div>
+          <div class="m-value">${winRate.toFixed(0)}%</div>
+          <div class="m-sub"><span class="pnl-positive">${wins.length}W</span> · <span class="pnl-negative">${losses.length}L</span></div>
+        </div>
+        <div class="metric">
+          <div class="m-label">Avg Gain %</div>
+          <div class="m-value ${pnlClass(avgGain)}">${avgGain >= 0 ? '+' : ''}${avgGain.toFixed(2)}%</div>
+          <div class="m-sub">per trade</div>
+        </div>
       </div>
     </div>
 
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Realized P&L</div>
-        <div class="stat-value ${pnlClass(s.totalRealized)}">${formatPnl(s.totalRealized)}</div>
-        <div class="stat-meta">${s.closed.length} closed trade${s.closed.length === 1 ? '' : 's'}</div>
+    <div class="card" style="margin-top: 14px;">
+      <div class="card-header">
+        <h3 class="card-title">Latest Trades</h3>
+        <button class="btn-ghost btn btn-sm" onclick="switchTab('trades')">See all →</button>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Win Rate</div>
-        <div class="stat-value">${s.winRate.toFixed(1)}%</div>
-        <div class="stat-meta"><span class="pnl-positive">${s.wins.length}W</span> · <span class="pnl-negative">${s.losses.length}L</span></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Open Trades</div>
-        <div class="stat-value">${s.open.length}</div>
-        <div class="stat-meta">${state.portfolio.length} holdings (Core)</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Avg P&L / Trade</div>
-        <div class="stat-value ${pnlClass(s.avgPnl)}">${formatPnl(s.avgPnl)}</div>
-        <div class="stat-meta">All closed satellite trades</div>
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: 1fr; gap: 14px;">
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Recent Closed</h3>
-          <button class="btn-ghost btn btn-sm" onclick="switchTab('trades')">View all →</button>
-        </div>
-        ${recentClosed.length ? recentClosed.map(t => `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-subtle);">
-            <div>
-              <div class="mono" style="font-weight: 600;">${escapeHtml(t.symbol)}</div>
-              <div style="color: var(--text-muted); font-size: 11px;">${formatDate(t.closedAt || t.entryDate, { day:'2-digit', month:'short' })} · ${t.category}</div>
-            </div>
-            <div class="mono ${pnlClass(t.realizedPnl)}" style="font-weight: 600;">${formatPnl(t.realizedPnl)}</div>
-          </div>
-        `).join('') : '<div style="color: var(--text-muted); padding: 20px 0; text-align: center; font-size: 13px;">No closed trades yet</div>'}
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Open Positions</h3>
-          <button class="btn-ghost btn btn-sm" onclick="switchTab('trades')">View all →</button>
-        </div>
-        ${recentOpen.length ? recentOpen.map(t => {
-          const live = window.livePrices[t.symbol];
-          const unreal = live ? (live.price - Number(t.entryPrice)) * Number(t.entryQty) : null;
-          return `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-subtle);">
+      ${latest.length ? latest.map(t => {
+        const np = netPnl(t);
+        const pct = tradeGainPct(t);
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border-subtle);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 34px; text-align: center;">
+                <div style="font-size: 16px; font-weight: 700; line-height: 1;">${new Date(t.closedAt).getDate()}</div>
+                <div style="font-size: 10px; color: var(--text-muted);">${new Date(t.closedAt).toLocaleString('en-IN', { month: 'short' })}</div>
+              </div>
               <div>
                 <div class="mono" style="font-weight: 600;">${escapeHtml(t.symbol)}</div>
-                <div style="color: var(--text-muted); font-size: 11px;">${formatDate(t.entryDate, { day:'2-digit', month:'short' })} · ${t.entryQty} @ ${formatINR(t.entryPrice)}</div>
+                <div style="color: var(--text-muted); font-size: 11px; text-transform: capitalize;">${t.category || (t.portfolioType === 'core' ? 'core' : 'stocks')}</div>
               </div>
-              <div class="mono ${pnlClass(unreal)}" style="font-weight: 600; font-size: 13px;">${unreal !== null ? formatPnl(unreal) : '—'}</div>
             </div>
-          `;
-        }).join('') : '<div style="color: var(--text-muted); padding: 20px 0; text-align: center; font-size: 13px;">No open trades</div>'}
-      </div>
+            <div style="text-align: right;">
+              <div class="mono ${pnlClass(np)}" style="font-weight: 700;">${formatPnl(np)}</div>
+              ${pct !== null ? `<div class="mono ${pnlClass(pct)}" style="font-size: 11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('') : '<div style="color: var(--text-muted); padding: 24px 0; text-align: center; font-size: 13px;">No closed trades in this period</div>'}
     </div>
   `;
+}
+
+function setDashboardRange(r) { dashboardRange = r; renderDashboard(); }
+
+/* ========================================================================
+   MY JOURNAL — Daily / Monthly / Calendar
+   ======================================================================== */
+function renderJournal() {
+  const views = [['daily','Daily'],['monthly','Monthly'],['calendar','Calendar']];
+  let content = '';
+  if (journalView === 'daily') content = journalDailyHTML();
+  else if (journalView === 'monthly') content = journalMonthlyHTML();
+  else content = journalCalendarHTML();
+
+  document.getElementById('panel-journal').innerHTML = `
+    <div class="seg full" style="margin-bottom: 16px;">
+      ${views.map(([v, l]) => `<button class="seg-btn ${journalView === v ? 'active' : ''}" onclick="setJournalView('${v}')">${l}</button>`).join('')}
+    </div>
+    ${content}
+  `;
+}
+
+function setJournalView(v) { journalView = v; renderJournal(); }
+
+// Group closed trades by local day; returns sorted array (newest first).
+function journalDays() {
+  const map = {};
+  allClosedTrades().forEach(t => {
+    const k = dayKey(t.closedAt);
+    if (!k) return;
+    (map[k] = map[k] || []).push(t);
+  });
+  return Object.keys(map).sort((a, b) => b.localeCompare(a)).map(k => ({ key: k, trades: map[k] }));
+}
+
+function journalDailyHTML() {
+  const days = journalDays();
+  if (!days.length) return emptyJournal('No closed trades yet', 'Close a trade to see your daily journal.');
+
+  return days.map(({ key, trades }) => {
+    const d = new Date(key + 'T00:00:00');
+    const net = trades.reduce((s, t) => s + netPnl(t), 0);
+    const comm = trades.reduce((s, t) => s + (Number(t.commission) || 0), 0);
+    const wins = trades.filter(t => netPnl(t) > 0).length;
+    const losses = trades.filter(t => netPnl(t) < 0).length;
+    const wr = trades.length ? Math.round(wins / trades.length * 100) : 0;
+    const note = (state.journalNotes || {})[key];
+    const pills = trades.map(t => `<span class="pill ${netPnl(t) >= 0 ? 'win' : 'loss'}">${escapeHtml(t.symbol)}</span>`).join('');
+    return `
+      <div class="jcard">
+        <div class="jcard-date">
+          <div class="jd-day">${String(d.getDate()).padStart(2, '0')}</div>
+          <div class="jd-dow">${d.toLocaleString('en-IN', { weekday: 'short' })}</div>
+        </div>
+        <div class="jcard-body">
+          <div class="jcard-grid">
+            <div class="jg-row"><span>PnL</span><span class="${pnlClass(net)}">${formatPnl(net)}</span></div>
+            <div class="jg-row"><span>Wins</span><span>${wins}</span></div>
+            <div class="jg-row"><span>Win %</span><span>${wr}%</span></div>
+            <div class="jg-row"><span>Losses</span><span>${losses}</span></div>
+            <div class="jg-row"><span>Trades</span><span>${trades.length}</span></div>
+            <div class="jg-row"><span>Commissions</span><span>${formatINR(comm)}</span></div>
+          </div>
+          <div class="pill-wrap">${pills}</div>
+          ${note ? `<div style="font-size:12px;color:var(--text-muted);background:var(--surface-3);border-radius:8px;padding:8px 10px;margin-bottom:10px;">📝 ${escapeHtml(note)}</div>` : ''}
+          <div class="jcard-actions">
+            <button class="btn btn-secondary btn-sm" onclick="openDayTrades('${key}')">View Trades</button>
+            <button class="btn btn-secondary btn-sm" onclick="openDayNote('${key}')">${note ? 'Edit Note' : 'Add Note'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function journalMonthlyHTML() {
+  const map = {};
+  allClosedTrades().forEach(t => {
+    const d = new Date(t.closedAt);
+    if (isNaN(d.getTime())) return;
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    (map[k] = map[k] || []).push(t);
+  });
+  const keys = Object.keys(map).sort((a, b) => b.localeCompare(a));
+  if (!keys.length) return emptyJournal('No closed trades yet', 'Close trades to build your monthly view.');
+
+  return keys.map(k => {
+    const trades = map[k].slice().sort((a, b) => new Date(a.closedAt) - new Date(b.closedAt));
+    const [yr, mo] = k.split('-').map(Number);
+    const label = new Date(yr, mo - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    const net = trades.reduce((s, t) => s + netPnl(t), 0);
+    const wins = trades.filter(t => netPnl(t) > 0).length;
+    const wr = trades.length ? Math.round(wins / trades.length * 100) : 0;
+    const gainPcts = trades.map(tradeGainPct).filter(v => v !== null);
+    const avgGain = gainPcts.length ? gainPcts.reduce((a, b) => a + b, 0) / gainPcts.length : 0;
+    // cumulative equity within the month for the sparkline
+    let cum = 0;
+    const pts = trades.map(t => (cum += netPnl(t)));
+    return `
+      <div class="card" style="margin-bottom: 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <h3 class="card-title">${label}</h3>
+          <span class="mono ${pnlClass(net)}" style="font-weight:700;">${formatPnl(net)}</span>
+        </div>
+        <div class="metric-row" style="margin-bottom:10px;">
+          <div class="metric"><div class="m-label">Profit</div><div class="m-value ${pnlClass(net)}" style="font-size:15px;">${formatPnl(net)}</div></div>
+          <div class="metric"><div class="m-label">Wins (%)</div><div class="m-value">${wr}%</div></div>
+          <div class="metric"><div class="m-label">Avg gain (%)</div><div class="m-value ${pnlClass(avgGain)}">${avgGain >= 0 ? '+' : ''}${avgGain.toFixed(2)}%</div></div>
+        </div>
+        ${sparklineSVG(pts)}
+      </div>
+    `;
+  }).join('');
+}
+
+// Lightweight inline equity sparkline.
+function sparklineSVG(pts) {
+  if (!pts || pts.length < 2) return '';
+  const w = 480, h = 70, pad = 4;
+  const min = Math.min(0, ...pts), max = Math.max(0, ...pts);
+  const range = (max - min) || 1;
+  const stepX = (w - pad * 2) / (pts.length - 1);
+  const y = (v) => h - pad - ((v - min) / range) * (h - pad * 2);
+  const d = pts.map((v, i) => `${i === 0 ? 'M' : 'L'} ${(pad + i * stepX).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const last = pts[pts.length - 1];
+  const color = last >= 0 ? 'var(--success)' : 'var(--error)';
+  const zeroY = y(0).toFixed(1);
+  return `<svg class="jspark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <line x1="${pad}" y1="${zeroY}" x2="${w - pad}" y2="${zeroY}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"/>
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function emptyJournal(title, desc) {
+  return `<div class="empty-state"><div class="empty-state-icon">📓</div><div class="empty-state-title">${title}</div><div class="empty-state-desc">${desc}</div></div>`;
+}
+
+// ---- Journal Calendar view (Sun-first grid + weekly totals column) ----
+function journalCalendarHTML() {
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const monthName = calendarMonth.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDow = firstDay.getDay(); // Sun=0
+  const daysInMonth = lastDay.getDate();
+  const today = new Date();
+
+  const dayMap = {};
+  allClosedTrades().forEach(t => {
+    const d = new Date(t.closedAt);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const k = d.getDate();
+      if (!dayMap[k]) dayMap[k] = { pnl: 0, count: 0 };
+      dayMap[k].pnl += netPnl(t);
+      dayMap[k].count++;
+    }
+  });
+
+  // Build cells (leading blanks + days), then chunk into weeks of 7 for weekly totals.
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const dows = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let head = dows.map(d => `<div class="jcal-h">${d}</div>`).join('') + `<div class="jcal-h">Week</div>`;
+
+  let body = '';
+  for (let w = 0; w < cells.length / 7; w++) {
+    const week = cells.slice(w * 7, w * 7 + 7);
+    let weekPnl = 0, weekCount = 0;
+    body += week.map(d => {
+      if (!d) return `<div class="jcal-cell empty"></div>`;
+      const info = dayMap[d];
+      const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+      let cls = 'jcal-cell';
+      if (info) { weekPnl += info.pnl; weekCount += info.count; cls += info.pnl > 0 ? ' pos' : (info.pnl < 0 ? ' neg' : ''); }
+      if (isToday) cls += ' today';
+      return `<div class="${cls}">
+        <div class="jcal-num">${d}</div>
+        ${info ? `<div class="jcal-pnl">${info.pnl >= 0 ? '+' : '-'}${shortMoney(Math.abs(info.pnl))}</div><div class="jcal-cnt">${info.count} trade${info.count === 1 ? '' : 's'}</div>` : ''}
+      </div>`;
+    }).join('') + `<div class="jcal-cell wk ${weekCount ? (weekPnl >= 0 ? 'pos' : 'neg') : ''}">
+        ${weekCount ? `<div class="jcal-pnl">${weekPnl >= 0 ? '+' : '-'}${shortMoney(Math.abs(weekPnl))}</div><div class="jcal-cnt">${weekCount} trade${weekCount === 1 ? '' : 's'}</div>` : ''}
+      </div>`;
+  }
+
+  const monthTotal = Object.values(dayMap).reduce((s, x) => s + x.pnl, 0);
+  const monthCount = Object.values(dayMap).reduce((s, x) => s + x.count, 0);
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <button class="btn btn-ghost btn-sm" onclick="shiftJournalCal(-1)">‹</button>
+      <div style="font-weight:700;font-size:16px;">${monthName}</div>
+      <button class="btn btn-ghost btn-sm" onclick="shiftJournalCal(1)">›</button>
+    </div>
+    <div class="jcal-grid">${head}${body}</div>
+    <div style="display:flex;gap:20px;margin-top:14px;font-size:12px;">
+      <div><span style="color:var(--text-muted);">Month total:</span> <span class="mono ${pnlClass(monthTotal)}" style="font-weight:700;">${formatPnl(monthTotal)}</span></div>
+      <div><span style="color:var(--text-muted);">Trades:</span> <span class="mono" style="font-weight:700;">${monthCount}</span></div>
+    </div>
+  `;
+}
+
+function shiftJournalCal(delta) {
+  calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1);
+  renderJournal();
+}
+
+// Compact money formatting for calendar cells (e.g. 23.4K).
+function shortMoney(n) {
+  const a = Math.abs(n);
+  if (a >= 1e7) return '₹' + (n / 1e7).toFixed(1) + 'Cr';
+  if (a >= 1e5) return '₹' + (n / 1e5).toFixed(1) + 'L';
+  if (a >= 1e3) return '₹' + (n / 1e3).toFixed(1) + 'K';
+  return '₹' + Math.round(n);
+}
+
+// ---- Journal day detail + notes ----
+function openDayTrades(key) {
+  const trades = allClosedTrades().filter(t => dayKey(t.closedAt) === key)
+    .sort((a, b) => new Date(a.closedAt) - new Date(b.closedAt));
+  const d = new Date(key + 'T00:00:00');
+  const body = trades.length ? trades.map(t => {
+    const np = netPnl(t);
+    const pct = tradeGainPct(t);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+      <div>
+        <div class="mono" style="font-weight:600;">${escapeHtml(t.symbol)}</div>
+        <div style="color:var(--text-muted);font-size:11px;">${t.entryQty || t.exitQty || ''} qty · ${formatINR(t.entryPrice)} → ${formatINR(t.exitPrice)}${t.commission ? ' · fee ' + formatINR(t.commission) : ''}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="mono ${pnlClass(np)}" style="font-weight:700;">${formatPnl(np)}</div>
+        ${pct !== null ? `<div class="mono ${pnlClass(pct)}" style="font-size:11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>` : ''}
+      </div>
+    </div>`;
+  }).join('') : '<div style="color:var(--text-muted);text-align:center;padding:20px 0;">No trades</div>';
+  showModal({ title: d.toLocaleString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }), body });
+}
+
+function openDayNote(key) {
+  const existing = (state.journalNotes || {})[key] || '';
+  const d = new Date(key + 'T00:00:00');
+  showModal({
+    title: `Note — ${d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+    body: `<div class="form-group"><label class="form-label">Journal note</label><textarea class="form-textarea" id="dayNoteInput" rows="5" placeholder="What happened today? Mistakes, emotions, lessons...">${escapeHtml(existing)}</textarea></div>`,
+    footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn" id="saveDayNoteBtn">Save Note</button>`
+  });
+  document.getElementById('saveDayNoteBtn').onclick = async () => {
+    const val = document.getElementById('dayNoteInput').value.trim();
+    if (!state.journalNotes) state.journalNotes = {};
+    if (val) state.journalNotes[key] = val; else delete state.journalNotes[key];
+    await saveState();
+    closeModal();
+    renderJournal();
+    showToast('Note saved', 'success');
+  };
 }
 
 /* ========================================================================
@@ -2063,6 +2645,7 @@ function openCloseCoreModal(id) {
     const exitNotes = document.getElementById('cc-exitNotes').value.trim();
     let realizedPnl = parseFloat(document.getElementById('cc-pnl').value);
     if (isNaN(realizedPnl)) realizedPnl = (exitPrice - Number(p.avgPrice)) * sellQty;
+    const commission = estimateCommission(Number(p.avgPrice) * sellQty + exitPrice * sellQty);
 
     // Create core-closed record
     const record = {
@@ -2078,6 +2661,7 @@ function openCloseCoreModal(id) {
       exitDesc: exitNotes,
       exitChart: exitChartData,
       realizedPnl: realizedPnl,
+      commission: commission,
       closedAt: exitDate ? new Date(exitDate).toISOString() : new Date().toISOString(),
       status: 'closed'
     };
@@ -2339,9 +2923,15 @@ function openCloseTradeModal(tradeId) {
         <div class="form-group"><label class="form-label">Exit Qty</label><input class="form-input mono" id="cf-qty" type="number" step="1" value="${t.entryQty}"></div>
         <div class="form-group"><label class="form-label">Exit Date</label><input class="form-input mono" id="cf-date" type="datetime-local" value="${defaultDate}"></div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Realized P&L ₹ <span style="color: var(--text-subtle); text-transform: none; letter-spacing: 0;">(auto-calculated if blank)</span></label>
-        <input class="form-input mono" id="cf-pnl" type="number" step="0.01" placeholder="Leave blank for auto">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Realized P&L ₹ <span style="color: var(--text-subtle); text-transform: none; letter-spacing: 0;">(auto if blank)</span></label>
+          <input class="form-input mono" id="cf-pnl" type="number" step="0.01" placeholder="Leave blank for auto">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Commission ₹ <span style="color: var(--text-subtle); text-transform: none; letter-spacing: 0;">(auto if blank)</span></label>
+          <input class="form-input mono" id="cf-comm" type="number" step="0.01" placeholder="Est. fees">
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Exit Notes</label><textarea class="form-textarea" id="cf-desc" rows="3" placeholder="Why you exited, what worked/didn't..."></textarea></div>
       <div class="form-group">
@@ -2376,6 +2966,10 @@ function openCloseTradeModal(tradeId) {
       realizedPnl = (exitPrice - Number(t.entryPrice)) * exitQty;
     }
     if (isNaN(exitPrice) || exitPrice <= 0) return showToast('Valid exit price required', 'error');
+    let commission = parseFloat(document.getElementById('cf-comm').value);
+    if (isNaN(commission)) {
+      commission = estimateCommission(Number(t.entryPrice) * exitQty + exitPrice * exitQty);
+    }
     t.status = 'closed';
     t.exitPrice = exitPrice;
     t.exitQty = exitQty;
@@ -2383,10 +2977,12 @@ function openCloseTradeModal(tradeId) {
     t.exitDesc = (document.getElementById('cf-desc').value || '').trim();
     t.exitChart = exitChart;
     t.realizedPnl = realizedPnl;
+    t.commission = commission;
     t.closedAt = new Date().toISOString();
     await saveState();
     closeModal();
-    showToast(`Trade closed: ${formatPnl(realizedPnl)}`, realizedPnl >= 0 ? 'success' : 'warning');
+    const net = realizedPnl - commission;
+    showToast(`Trade closed: ${formatPnl(net)} net`, net >= 0 ? 'success' : 'warning');
     renderActivePanel();
   };
 }
@@ -2982,8 +3578,8 @@ function renderAnalytics() {
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">Total P&L</div><div class="stat-value ${pnlClass(s.totalRealized)}">${formatPnl(s.totalRealized)}</div></div>
       <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value">${s.winRate.toFixed(1)}%</div></div>
-      <div class="stat-card"><div class="stat-label">Best Trade</div><div class="stat-value pnl-positive" style="font-size: 16px;">${s.best ? s.best.symbol + ' ' + formatPnl(s.best.realizedPnl) : '—'}</div></div>
-      <div class="stat-card"><div class="stat-label">Worst Trade</div><div class="stat-value pnl-negative" style="font-size: 16px;">${s.worst ? s.worst.symbol + ' ' + formatPnl(s.worst.realizedPnl) : '—'}</div></div>
+      <div class="stat-card"><div class="stat-label">Best Trade</div><div class="stat-value pnl-positive" style="font-size: 16px;">${s.best ? s.best.symbol + ' ' + formatPnl(netPnl(s.best)) : '—'}</div></div>
+      <div class="stat-card"><div class="stat-label">Worst Trade</div><div class="stat-value pnl-negative" style="font-size: 16px;">${s.worst ? s.worst.symbol + ' ' + formatPnl(netPnl(s.worst)) : '—'}</div></div>
     </div>
 
     <div class="card" style="margin-bottom: 14px;">
@@ -3024,9 +3620,9 @@ function renderMonthlyRows() {
       const cd = new Date(t.closedAt);
       return cd.getFullYear() === year && cd.getMonth() === month;
     });
-    const total = trades.reduce((s, t) => s + (Number(t.realizedPnl) || 0), 0);
-    const wins = trades.filter(t => (Number(t.realizedPnl) || 0) > 0).length;
-    const losses = trades.filter(t => (Number(t.realizedPnl) || 0) < 0).length;
+    const total = trades.reduce((s, t) => s + netPnl(t), 0);
+    const wins = trades.filter(t => netPnl(t) > 0).length;
+    const losses = trades.filter(t => netPnl(t) < 0).length;
     const wr = trades.length ? (wins / trades.length * 100).toFixed(0) + '%' : '—';
     rows.push(`<tr>
       <td>${d.toLocaleString('en-IN', { month: 'short', year: 'numeric' })}</td>
@@ -3046,8 +3642,8 @@ function renderCategoryRows() {
     <tbody>
       ${cats.map(c => {
         const trades = state.trades.filter(t => t.status === 'closed' && t.category === c);
-        const total = trades.reduce((s, t) => s + (Number(t.realizedPnl) || 0), 0);
-        const wins = trades.filter(t => (Number(t.realizedPnl) || 0) > 0).length;
+        const total = trades.reduce((s, t) => s + netPnl(t), 0);
+        const wins = trades.filter(t => netPnl(t) > 0).length;
         const wr = trades.length ? (wins / trades.length * 100).toFixed(1) + '%' : '—';
         return `<tr>
           <td style="text-transform: capitalize;">${c}</td>
@@ -3081,7 +3677,7 @@ function drawEquityCurve() {
 
   let cumulative = 0;
   const points = closed.map(t => {
-    cumulative += Number(t.realizedPnl) || 0;
+    cumulative += netPnl(t);
     return { date: new Date(t.closedAt), pnl: cumulative };
   });
   points.unshift({ date: new Date(points[0].date.getTime() - 86400000), pnl: 0 });
@@ -3308,6 +3904,24 @@ function renderSettings() {
       </div>
     </div>
 
+    <!-- COMMISSIONS -->
+    <div class="section-panel">
+      <h3 class="section-panel-title">💸 Commissions &amp; Fees</h3>
+      <p class="section-panel-desc">When enabled, brokerage/fees are auto-estimated as a % of turnover when you close a trade (editable each time). P&amp;L across the app is shown net of fees.</p>
+      <div class="form-group">
+        <label class="form-label">Track Commissions</label>
+        <div class="toggle-group">
+          <button class="toggle-btn ${state.settings.trackCommission ? 'active' : ''}" onclick="setTrackCommission(true)">ON</button>
+          <button class="toggle-btn ${!state.settings.trackCommission ? 'active' : ''}" onclick="setTrackCommission(false)">OFF</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estimate Rate (% of turnover)</label>
+        <input class="form-input mono" id="commRateInput" type="number" step="0.001" min="0" value="${((Number(state.settings.commissionRate) || 0) * 100).toFixed(3)}" onchange="setCommissionRate(this.value)">
+        <p style="margin: 6px 0 0; font-size: 11px; color: var(--text-subtle);">Turnover = buy value + sell value. e.g. 0.05% ≈ typical all-in delivery charges.</p>
+      </div>
+    </div>
+
     <!-- LIVE PRICES -->
     <div class="section-panel">
       <h3 class="section-panel-title">📡 Live Prices</h3>
@@ -3507,6 +4121,19 @@ function setExchange(ex) {
   state.settings.exchange = ex;
   saveState();
   renderSettings();
+}
+function setTrackCommission(on) {
+  state.settings.trackCommission = on;
+  saveState();
+  renderSettings();
+  showToast(`Commission tracking ${on ? 'enabled' : 'disabled'}`, 'success');
+}
+function setCommissionRate(val) {
+  const pct = parseFloat(val);
+  if (isNaN(pct) || pct < 0) return showToast('Enter a valid rate', 'error');
+  state.settings.commissionRate = pct / 100;
+  saveState();
+  showToast('Commission rate updated', 'success');
 }
 function toggleAutoRefresh(on) {
   state.settings.autoRefresh = on;
@@ -3852,6 +4479,7 @@ async function importZerodhaTradebook(event) {
           exitQty: g.netSellQty,
           exitDate: now,
           realizedPnl: g.realizedPnl,
+          commission: estimateCommission(g.netSellQty * (g.avgBuy + g.avgSell)),
           closedAt: now,
           tags: ['zerodha-import'],
           createdAt: now
@@ -4130,15 +4758,18 @@ async function init() {
   setInterval(updateMarketStatus, 1000);
   setupAutoRefresh();
   document.getElementById('searchBtn').onclick = openSearchModal;
-  document.getElementById('quickAddBtn').onclick = () => switchTab('entry');
   document.getElementById('themeToggleBtn').onclick = toggleTheme;
+  document.getElementById('menuBtn').onclick = openDrawer;
+  document.getElementById('drawerCloseBtn').onclick = closeDrawer;
+  document.getElementById('drawerOverlay').onclick = closeDrawer;
+  document.getElementById('fabBtn').onclick = () => switchTab('entry');
   // Keyboard shortcut: Cmd/Ctrl+K
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       openSearchModal();
     }
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') { closeModal(); closeDrawer(); }
   });
 }
 
