@@ -1041,7 +1041,18 @@ html.light .dock-btn.active .dock-icon {
   padding: 16px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.drawer-nav { padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.drawer-search-wrap {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 12px 2px; padding: 8px 12px;
+  background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 10px;
+}
+.drawer-search-icon { flex-shrink: 0; color: var(--text-muted); }
+.drawer-search-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: inherit; font-size: 14px;
+}
+.drawer-search-input::placeholder { color: var(--text-muted); }
+.drawer-nav { padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
 .drawer-item {
   display: flex;
   align-items: center;
@@ -1536,7 +1547,7 @@ table.data-table tr:last-child td { border-bottom: none; }
 .ai-subhead h2 { font-size: 18px; font-weight: 700; margin: 0; }
 
 /* Chat */
-.ai-chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 230px); min-height: 360px; }
+.ai-chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 160px); min-height: 400px; }
 .ai-chat-msgs { flex: 1; overflow-y: auto; padding: 4px 2px 12px; display: flex; flex-direction: column; gap: 12px; }
 .ai-bubble {
   max-width: 86%; padding: 12px 14px; border-radius: 16px; font-size: 14px; line-height: 1.55;
@@ -1635,18 +1646,22 @@ table.data-table tr:last-child td { border-bottom: none; }
   <div class="drawer-head">
     <div class="brand">
       <div class="brand-logo">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="4" y="3" width="20" height="26" rx="2" fill="#000" stroke="#fff" stroke-width="1"/>
-          <circle cx="6.5" cy="6" r="1" fill="#fff"/><circle cx="6.5" cy="10" r="1" fill="#fff"/><circle cx="6.5" cy="14" r="1" fill="#fff"/><circle cx="6.5" cy="18" r="1" fill="#fff"/><circle cx="6.5" cy="22" r="1" fill="#fff"/>
-          <text x="14" y="13" font-size="7" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="middle">Trading</text>
-          <text x="14" y="19" font-size="6" font-weight="600" fill="#fff" text-anchor="middle" dominant-baseline="middle">Journal</text>
+        <svg width="28" height="28" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="44" height="44" rx="9" fill="#0f172a"/>
+          <path d="M 11,34 L 11,11 L 33,34 L 33,11" stroke="#e2e8f0" stroke-width="4.5" fill="none" stroke-linecap="butt" stroke-linejoin="miter"/>
+          <line x1="7" y1="38" x2="34" y2="9" stroke="#22c55e" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M 37,6 L 29,9 L 33,15 Z" fill="#22c55e"/>
         </svg>
       </div>
-      <span>Naz Trades</span>
+      <span>NazTrades</span>
     </div>
     <button class="icon-btn" id="drawerCloseBtn" aria-label="Close menu">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
+  </div>
+  <div class="drawer-search-wrap">
+    <svg class="drawer-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" class="drawer-search-input" id="drawerSearch" placeholder="Search…" oninput="filterDrawer(this.value)">
   </div>
   <nav class="drawer-nav" id="drawerNav"></nav>
 </aside>
@@ -1726,6 +1741,7 @@ const DEFAULT_STATE = {
   rules: [],
   settings: {
     exchange: 'NSE',
+    tvLayoutId: '',
     autoRefresh: false,
     refreshInterval: 5,
     theme: 'dark',
@@ -1973,7 +1989,11 @@ function netPnl(t) {
 
 function tvUrl(symbol) {
   const ex = (state.settings && state.settings.exchange) || 'NSE';
-  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(ex + ':' + symbol)}`;
+  const layoutId = (state.settings && state.settings.tvLayoutId) || '';
+  const base = layoutId
+    ? `https://www.tradingview.com/chart/${encodeURIComponent(layoutId)}/`
+    : 'https://www.tradingview.com/chart/';
+  return `${base}?symbol=${encodeURIComponent(ex + ':' + symbol)}`;
 }
 
 const TV_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`;
@@ -2176,10 +2196,19 @@ function switchTab(tabId) {
 function openDrawer() {
   document.getElementById('drawer').classList.add('open');
   document.getElementById('drawerOverlay').classList.add('open');
+  const s = document.getElementById('drawerSearch');
+  if (s) { s.value = ''; filterDrawer(''); s.focus(); }
 }
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
+}
+function filterDrawer(q) {
+  const term = q.trim().toLowerCase();
+  document.querySelectorAll('#drawerNav .drawer-item').forEach(btn => {
+    const label = btn.querySelector('span') ? btn.querySelector('span').textContent.toLowerCase() : '';
+    btn.style.display = (!term || label.includes(term)) ? '' : 'none';
+  });
 }
 
 /* ---- Header AI button → opens the AI section ---- */
@@ -4761,7 +4790,8 @@ function aiChatHTML() {
   const msgs = aiChatMessages.map(m => `
     <div class="ai-bubble ${m.role}">${escapeHtml(m.text)}${m.image ? `<img src="${m.image}">` : ''}</div>`).join('');
   const thinking = aiBusy ? `<div class="ai-bubble assistant thinking" id="aiThinking">Thinking…</div>` : '';
-  const chips = `<div class="ai-chips">
+  const hasUserMsg = aiChatMessages.some(m => m.role === 'user');
+  const chips = hasUserMsg ? '' : `<div class="ai-chips">
       <button class="ai-chip" onclick="aiChip('Analyze the business of ')">🏢 Analyze a business</button>
       <button class="ai-chip" onclick="aiChip('Bull vs bear case for ')">⚖️ Bull vs bear</button>
       <button class="ai-chip" onclick="aiChip('Review my open positions')">🔍 Review positions</button>
@@ -4809,7 +4839,28 @@ function aiChip(text) {
 }
 function aiClearAttach() { aiAttachImage = null; renderAI(); }
 function aiScrollChat() {
-  setTimeout(() => { const el = document.getElementById('aiChatMsgs'); if (el) el.scrollTop = el.scrollHeight; }, 30);
+  const el = document.getElementById('aiChatMsgs');
+  if (el) el.scrollTop = el.scrollHeight;
+}
+function aiAppendBubble(role, text, image) {
+  const msgs = document.getElementById('aiChatMsgs');
+  if (!msgs) return;
+  const div = document.createElement('div');
+  div.className = `ai-bubble ${role}`;
+  div.textContent = text;
+  if (image) { const img = document.createElement('img'); img.src = image; div.appendChild(img); }
+  msgs.appendChild(div);
+  aiScrollChat();
+}
+function aiShowThinking(show) {
+  const msgs = document.getElementById('aiChatMsgs');
+  if (!msgs) return;
+  const existing = document.getElementById('aiThinking');
+  if (show && !existing) {
+    const div = document.createElement('div');
+    div.className = 'ai-bubble assistant thinking'; div.id = 'aiThinking'; div.textContent = 'Thinking…';
+    msgs.appendChild(div); aiScrollChat();
+  } else if (!show && existing) { existing.remove(); }
 }
 async function aiSendChat() {
   if (aiBusy) return;
@@ -4818,20 +4869,40 @@ async function aiSendChat() {
   if (!text && !aiAttachImage) return;
   if (!aiHasKey()) { showToast('Add an API key in Settings first', 'error'); return; }
   const image = aiAttachImage;
+  if (input) input.value = '';
   aiChatMessages.push({ role: 'user', text: text || '(image)', image });
   aiAttachImage = null;
+  // Remove image preview without full re-render
+  const preview = document.querySelector('.ai-attach-preview');
+  if (preview) preview.remove();
+  // Hide chips after first user message
+  if (aiChatMessages.filter(m => m.role === 'user').length === 1) {
+    const chips = document.querySelector('.ai-chips');
+    if (chips) chips.style.display = 'none';
+  }
+  aiAppendBubble('user', text || '(image)', image);
   aiBusy = true;
-  renderAI(); aiScrollChat();
+  const sendBtn = document.getElementById('aiSendBtn');
+  const inp = document.getElementById('aiChatInput');
+  if (sendBtn) sendBtn.disabled = true;
+  if (inp) inp.disabled = true;
+  aiShowThinking(true);
   try {
     const system = "You are a sharp, concise trading and equity-research assistant inside a stock trading journal app for Indian markets (NSE/BSE). Give practical, structured answers. You do not have live fundamental data, so qualify forward-looking claims. Never give it as financial advice guarantees.";
     const history = aiChatMessages.filter(m => m.text).map(m => ({ role: m.role, text: m.text, image: m.role === 'user' ? m.image : null }));
     const reply = await callAI(system, history);
     aiChatMessages.push({ role: 'assistant', text: reply });
+    aiShowThinking(false);
+    aiAppendBubble('assistant', reply);
   } catch (err) {
-    aiChatMessages.push({ role: 'assistant', text: '⚠️ ' + err.message });
+    const msg = '⚠️ ' + err.message;
+    aiChatMessages.push({ role: 'assistant', text: msg });
+    aiShowThinking(false);
+    aiAppendBubble('assistant', msg);
   }
   aiBusy = false;
-  renderAI(); aiScrollChat();
+  if (sendBtn) sendBtn.disabled = false;
+  if (inp) { inp.disabled = false; inp.focus(); }
 }
 
 /* ----- Business Analysis (fixed prompt, user supplies symbol) ----- */
@@ -5121,6 +5192,11 @@ function renderSettings() {
           <button class="toggle-btn ${state.settings.exchange === 'NSE' ? 'active' : ''}" onclick="setExchange('NSE')">NSE</button>
           <button class="toggle-btn ${state.settings.exchange === 'BSE' ? 'active' : ''}" onclick="setExchange('BSE')">BSE</button>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">TradingView Layout ID <span style="color:var(--text-muted);font-weight:400;font-size:12px;">(optional — links open your saved chart)</span></label>
+        <input class="form-input" id="tvLayoutInput" placeholder="e.g. aBcDeFgH (from your TV chart URL)" value="${escapeHtml(state.settings.tvLayoutId || '')}" oninput="state.settings.tvLayoutId=this.value.trim(); saveState();">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Find it in your TradingView chart URL: tradingview.com/chart/<strong>aBcDeFgH</strong>/</div>
       </div>
       <div class="form-group">
         <label class="form-label">Auto-Refresh</label>
