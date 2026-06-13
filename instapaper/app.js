@@ -1655,7 +1655,7 @@ function Browser({T,sites,onSites,vault,onChangeVault,session,initialUrl,onClose
       h('button',{onClick:onClose,className:'act90',style:Object.assign({},iconBtnS,{color:T.fg})},Icons.x(22)),
       h('div',{style:{flex:1,display:'flex',alignItems:'center',gap:8,background:T.search,borderRadius:11,padding:'8px 12px',minWidth:0}},
         h('span',{style:{color:T.sub,display:'flex'}},Icons.search(15)),
-        h('input',{value:input,onChange:e=>setInput(e.target.value),placeholder:'Search Google or enter address',inputMode:'url',autoCapitalize:'none',autoCorrect:'off',spellCheck:false,
+        h('input',{value:input,onChange:e=>setInput(e.target.value),placeholder:'Search Google or enter address',inputMode:'text',enterKeyHint:'go',autoCapitalize:'none',autoCorrect:'off',spellCheck:false,
           onKeyDown:e=>{if(e.key==='Enter')go(input)},
           onFocus:e=>{try{e.target.select()}catch(err){}},
           style:{flex:1,border:'none',background:'transparent',color:T.fg,fontSize:14,minWidth:0}}),
@@ -2274,6 +2274,7 @@ function App(){
       h('div',{style:{flex:1}}),
       headerBtn(Icons.ai(22),()=>setAiOpen({})),
       headerBtn(Icons.contrast(22),cycleTheme),
+      headerBtn(Icons.globe(22),()=>setBrowserO({url:''})),
       headerBtn(Icons.dots(22),()=>setMenuOpen(true)));
   }
 

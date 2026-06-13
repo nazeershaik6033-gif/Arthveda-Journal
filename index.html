@@ -472,11 +472,11 @@ html.light .brand-logo {
   display: block;
   width: 100%;
   border: 0;
-  background: #1c1c1e;
+  background: #fff;
 }
 /* While the Reader is open, Instapaper takes over the whole viewport: the
    journal's header, market banner, bottom dock and FAB are hidden, and the
-   iframe is pinned to fill the screen. The journal state is untouched. */
+   iframe is pinned to fill the screen exactly (no gaps). State is untouched. */
 body.reader-active { overflow: hidden; }
 body.reader-active .header,
 body.reader-active .market-banner,
@@ -484,14 +484,23 @@ body.reader-active .bottom-dock,
 body.reader-active #fabBtn,
 body.reader-active .drawer,
 body.reader-active .drawer-overlay { display: none !important; }
-body.reader-active .container { max-width: none; padding: 0; }
+body.reader-active .container { max-width: none; padding: 0; margin: 0; }
 body.reader-active #panel-reader {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: #1c1c1e;
+  background: #fff;
 }
-body.reader-active .reader-frame { height: 100dvh; }
+body.reader-active #panel-reader .reader-embed {
+  position: absolute;
+  inset: 0;
+}
+body.reader-active #panel-reader .reader-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
 
 /* Page header */
 .page-header {
@@ -2334,21 +2343,8 @@ function renderReader() {
       '</div>';
     panel.dataset.loaded = '1';
   }
-  // Re-measure across the smooth-scroll reset that switchTab performs.
-  sizeReaderFrame();
-  requestAnimationFrame(sizeReaderFrame);
-  setTimeout(sizeReaderFrame, 380);
+  // Full-screen sizing is handled entirely in CSS (#panel-reader inset:0).
 }
-
-function sizeReaderFrame() {
-  const frame = document.getElementById('readerFrame');
-  if (!frame || activeTab !== 'reader') return;
-  // Standalone full-screen: the frame is fixed at the top, so fill the viewport.
-  frame.style.height = window.innerHeight + 'px';
-}
-
-window.addEventListener('resize', sizeReaderFrame);
-window.addEventListener('orientationchange', () => setTimeout(sizeReaderFrame, 150));
 
 // The embedded Instapaper posts this when its in-app Back arrow is tapped —
 // return to the journal's home and restore the normal chrome.
