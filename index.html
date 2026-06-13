@@ -1647,7 +1647,44 @@ const DEFAULT_STATE = {
     numFont: 'JetBrains Mono',
     numSize: 13,
     trackCommission: true,
-    commissionRate: 0.0005
+    commissionRate: 0.0005,
+    ai: {
+      provider: 'gemini',
+      keys: { gemini: '', openrouter: '' },
+      models: { gemini: 'gemini-2.5-flash', openrouter: 'deepseek/deepseek-r1:free' }
+    }
+  }
+};
+
+// Curated best free models from each provider (finance-friendly defaults)
+const AI_MODELS = {
+  gemini: [
+    { id: 'gemini-2.5-flash',      label: 'Gemini 2.5 Flash (fast, free tier)' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (fastest, free)' },
+    { id: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash (free tier)' },
+    { id: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro (most capable, limited free)' }
+  ],
+  openrouter: [
+    { id: 'deepseek/deepseek-r1:free',                    label: 'DeepSeek R1 (reasoning, free)' },
+    { id: 'deepseek/deepseek-chat-v3-0324:free',          label: 'DeepSeek V3 0324 (free)' },
+    { id: 'meta-llama/llama-3.3-70b-instruct:free',       label: 'Llama 3.3 70B Instruct (free)' },
+    { id: 'google/gemini-2.0-flash-exp:free',             label: 'Gemini 2.0 Flash Exp (free)' },
+    { id: 'qwen/qwen-2.5-72b-instruct:free',              label: 'Qwen 2.5 72B Instruct (free)' },
+    { id: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1 24B (free)' }
+  ]
+};
+const AI_PROVIDER_META = {
+  gemini: {
+    name: 'Google Gemini',
+    desc: "Uses Google's Gemini API directly — generous free tier. Get a key at",
+    keyUrl: 'https://aistudio.google.com/apikey',
+    keyLabel: 'aistudio.google.com/apikey'
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    desc: 'Routes to many models through one key — includes free community models. Get a key at',
+    keyUrl: 'https://openrouter.ai/keys',
+    keyLabel: 'openrouter.ai/keys'
   }
 };
 
@@ -1771,6 +1808,17 @@ function normalizeState(s) {
   if (s.journalNotes && typeof s.journalNotes === 'object') merged.journalNotes = s.journalNotes;
   if (Array.isArray(s.rules)) merged.rules = s.rules;
   if (s.settings && typeof s.settings === 'object') merged.settings = { ...merged.settings, ...s.settings };
+  // Deep-merge the AI config so older/partial saves keep all sub-fields
+  const savedAi = (s.settings && s.settings.ai) || {};
+  merged.settings.ai = {
+    provider: savedAi.provider || 'gemini',
+    keys: { gemini: '', openrouter: '', ...(savedAi.keys || {}) },
+    models: {
+      gemini: 'gemini-2.5-flash',
+      openrouter: 'deepseek/deepseek-r1:free',
+      ...(savedAi.models || {})
+    }
+  };
   merged.trades.forEach(t => { if (!Array.isArray(t.tags)) t.tags = []; });
   return merged;
 }
@@ -2020,9 +2068,15 @@ function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
 }
 
-/* ---- Header AI button (placeholder until features are defined) ---- */
+/* ---- Header AI button → opens AI Assistant settings ---- */
 function onAiClick() {
-  showToast('AI features coming soon ✨', 'info');
+  closeHeaderMenu();
+  switchTab('settings');
+  // Scroll to the AI card once the panel has rendered
+  setTimeout(() => {
+    const card = document.getElementById('aiSettingsCard');
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 60);
 }
 
 /* ---- Header three-dots watchlist menu ---- */
@@ -4478,6 +4532,9 @@ function renderSettings() {
       </div>
     </div>
 
+    <!-- AI ASSISTANT -->
+    ${aiSettingsHTML()}
+
     <!-- LIVE PRICES -->
     <div class="section-panel">
       <h3 class="section-panel-title">📡 Live Prices</h3>
@@ -4678,6 +4735,62 @@ function setExchange(ex) {
   saveState();
   renderSettings();
 }
+function aiSettingsHTML() {
+  const ai = state.settings.ai;
+  const provider = ai.provider || 'gemini';
+  const meta = AI_PROVIDER_META[provider];
+  const key = (ai.keys && ai.keys[provider]) || '';
+  const model = (ai.models && ai.models[provider]) || AI_MODELS[provider][0].id;
+  return `
+    <div class="section-panel" id="aiSettingsCard">
+      <h3 class="section-panel-title">✨ AI Assistant</h3>
+      <p class="section-panel-desc">Link an AI provider to power upcoming analysis features. Your API key is stored locally on this device only and is never sent anywhere except the provider you choose.</p>
+      <div class="form-group">
+        <label class="form-label">Provider</label>
+        <div class="toggle-group">
+          <button class="toggle-btn ${provider === 'openrouter' ? 'active' : ''}" onclick="setAiProvider('openrouter')">OpenRouter</button>
+          <button class="toggle-btn ${provider === 'gemini' ? 'active' : ''}" onclick="setAiProvider('gemini')">Google Gemini</button>
+        </div>
+      </div>
+      <p style="margin: -4px 0 12px; font-size: 12px; color: var(--text-muted);">
+        ${meta.desc} <a href="${meta.keyUrl}" target="_blank" rel="noopener" style="color: var(--primary);">${meta.keyLabel}</a>.
+      </p>
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <input class="form-input mono" id="aiKeyInput" type="password" autocomplete="off" spellcheck="false"
+          placeholder="Paste your ${meta.name} API key" value="${escapeHtml(key)}"
+          onchange="setAiKey(this.value)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Model</label>
+        <select class="form-select" id="aiModelSelect" onchange="setAiModel(this.value)">
+          ${AI_MODELS[provider].map(m => `<option value="${m.id}" ${m.id === model ? 'selected' : ''}>${escapeHtml(m.label)}</option>`).join('')}
+        </select>
+        <p class="mono" style="margin: 8px 0 0; font-size: 12px; color: var(--text-subtle);">${escapeHtml(model)}</p>
+      </div>
+    </div>`;
+}
+
+function setAiProvider(p) {
+  if (!AI_MODELS[p]) return;
+  state.settings.ai.provider = p;
+  saveState();
+  renderSettings();
+}
+function setAiKey(val) {
+  const p = state.settings.ai.provider;
+  state.settings.ai.keys[p] = (val || '').trim();
+  saveState();
+  showToast('API key saved', 'success');
+}
+function setAiModel(val) {
+  const p = state.settings.ai.provider;
+  state.settings.ai.models[p] = val;
+  saveState();
+  // Refresh the raw model-id line under the dropdown
+  renderSettings();
+}
+
 function setTrackCommission(on) {
   state.settings.trackCommission = on;
   saveState();
