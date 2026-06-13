@@ -310,6 +310,9 @@ html.light .brand-logo {
   flex: 1;
   justify-content: center;
   min-width: 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .header-brand-logo {
   display: flex;
@@ -1589,7 +1592,7 @@ table.data-table tr:last-child td { border-bottom: none; }
     <button class="icon-btn" id="menuBtn" title="Menu" aria-label="Open menu">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-    <div class="header-brand">
+    <div class="header-brand" onclick="headerBrandClick()" title="Go to Dashboard">
       <span class="header-brand-logo">
         <svg width="28" height="28" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <rect width="44" height="44" rx="9" fill="#0f172a"/>
@@ -2146,6 +2149,14 @@ function renderTabs() {
   });
 }
 
+function headerBrandClick() {
+  if (activeTab === 'dashboard') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    switchTab('dashboard');
+  }
+}
+
 function switchTab(tabId) {
   activeTab = tabId;
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -2418,6 +2429,106 @@ function donutSVG(winSum, lossSum) {
     </svg>`;
 }
 
+function renderCurrentHoldings() {
+  const openTrades = (state.trades || []).filter(t => t.status === 'open');
+  const coreItems = state.portfolio || [];
+  const total = openTrades.length + coreItems.length;
+
+  if (!total) return '';
+
+  // Compute totals for summary bar
+  let totalInvested = 0, totalCurrent = 0;
+  coreItems.forEach(p => {
+    const live = window.livePrices[p.symbol];
+    const invested = Number(p.qty) * Number(p.avgPrice);
+    const current = live ? Number(p.qty) * live.price : invested;
+    totalInvested += invested;
+    totalCurrent += current;
+  });
+  openTrades.forEach(t => {
+    const live = window.livePrices[t.symbol];
+    const invested = Number(t.entryQty) * Number(t.entryPrice);
+    const current = live ? Number(t.entryQty) * live.price : invested;
+    totalInvested += invested;
+    totalCurrent += current;
+  });
+  const totalPnl = totalCurrent - totalInvested;
+  const totalPct = totalInvested ? (totalPnl / totalInvested) * 100 : 0;
+
+  const rows = [
+    ...coreItems.map(p => {
+      const live = window.livePrices[p.symbol];
+      const invested = Number(p.qty) * Number(p.avgPrice);
+      const current = live ? Number(p.qty) * live.price : invested;
+      const pnl = current - invested;
+      const pct = invested ? (pnl / invested) * 100 : 0;
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="mono" style="font-weight:600;">${escapeHtml(p.symbol)}</span>
+                ${tvBtn(p.symbol)}
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                <span class="badge primary" style="font-size:9px;padding:1px 5px;">CORE</span>
+                <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(String(p.qty))} @ ${formatINR(p.avgPrice)}</span>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div class="mono ${pnlClass(pnl)}" style="font-weight:700;">${formatPnl(pnl)}</div>
+            <div class="mono ${pnlClass(pct)}" style="font-size:11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
+          </div>
+        </div>`;
+    }),
+    ...openTrades.map(t => {
+      const live = window.livePrices[t.symbol];
+      const invested = Number(t.entryQty) * Number(t.entryPrice);
+      const current = live ? Number(t.entryQty) * live.price : invested;
+      const pnl = current - invested;
+      const pct = invested ? (pnl / invested) * 100 : 0;
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="mono" style="font-weight:600;">${escapeHtml(t.symbol)}</span>
+                ${tvBtn(t.symbol)}
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                <span class="badge warning" style="font-size:9px;padding:1px 5px;">SAT</span>
+                <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(String(t.entryQty))} @ ${formatINR(t.entryPrice)}</span>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            ${live ? `<div class="mono ${pnlClass(pnl)}" style="font-weight:700;">${formatPnl(pnl)}</div><div class="mono ${pnlClass(pct)}" style="font-size:11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>` : `<div style="color:var(--text-muted);font-size:12px;">No live price</div>`}
+          </div>
+        </div>`;
+    })
+  ].join('');
+
+  return `
+    <div class="card" style="margin-top: 14px;">
+      <div class="card-header">
+        <h3 class="card-title">Current Holdings <span style="color:var(--text-muted);font-size:12px;font-weight:400;">${total}</span></h3>
+        <button class="btn-ghost btn btn-sm" onclick="switchTab('trades')">See all →</button>
+      </div>
+      <div style="display:flex;gap:16px;padding:8px 0 12px;border-bottom:1px solid var(--border-subtle);margin-bottom:2px;">
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Invested</div>
+          <div class="mono" style="font-size:13px;font-weight:600;">${formatINR(totalInvested)}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Unrealized P&L</div>
+          <div class="mono ${pnlClass(totalPnl)}" style="font-size:13px;font-weight:600;">${formatPnl(totalPnl)} <span style="font-size:11px;">(${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(2)}%)</span></div>
+        </div>
+      </div>
+      ${rows}
+    </div>`;
+}
+
 function renderDashboard() {
   const ranges = [['1w','1W'],['1m','1M'],['ytd','YTD'],['all','All']];
   const closed = closedInRange(dashboardRange);
@@ -2464,6 +2575,8 @@ function renderDashboard() {
         </div>
       </div>
     </div>
+
+    ${renderCurrentHoldings()}
 
     <div class="card" style="margin-top: 14px;">
       <div class="card-header">
