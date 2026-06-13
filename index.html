@@ -651,6 +651,16 @@ html.light .brand-logo {
   gap: 12px;
   flex-wrap: wrap;
 }
+.trade-symbol-row { display: flex; align-items: center; gap: 6px; }
+.tv-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
+  background: rgba(37,132,255,0.12); border: 1px solid rgba(37,132,255,0.25);
+  color: #2584ff; text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tv-btn:hover { background: rgba(37,132,255,0.22); border-color: rgba(37,132,255,0.45); }
+.tv-btn svg { width: 12px; height: 12px; }
 .trade-symbol {
   font-family: var(--font-mono);
   font-size: 18px;
@@ -1715,6 +1725,17 @@ function netPnl(t) {
   return gross - comm;
 }
 
+function tvUrl(symbol) {
+  const ex = (state.settings && state.settings.exchange) || 'NSE';
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(ex + ':' + symbol)}`;
+}
+
+const TV_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`;
+
+function tvBtn(symbol) {
+  return `<a class="tv-btn" href="${tvUrl(symbol)}" target="_blank" rel="noopener" title="View on TradingView">${TV_ICON}</a>`;
+}
+
 // Percentage return of a closed trade relative to entry cost.
 function tradeGainPct(t) {
   if (!t) return null;
@@ -2547,7 +2568,7 @@ function renderTradeCard(t) {
     <div class="trade-card animate-fade-up">
       <div class="trade-header">
         <div>
-          <div class="trade-symbol">${escapeHtml(t.symbol)}</div>
+          <div class="trade-symbol-row"><div class="trade-symbol">${escapeHtml(t.symbol)}</div>${tvBtn(t.symbol)}</div>
           ${t.tradeName ? `<div class="trade-name">${escapeHtml(t.tradeName)}</div>` : ''}
         </div>
         <div class="trade-badges">
@@ -2613,7 +2634,7 @@ function renderCorePortfolio() {
       <div class="trade-card">
         <div class="trade-header">
           <div>
-            <div class="trade-symbol">${escapeHtml(p.symbol)}</div>
+            <div class="trade-symbol-row"><div class="trade-symbol">${escapeHtml(p.symbol)}</div>${tvBtn(p.symbol)}</div>
             <div class="trade-name">${escapeHtml(p.tradeName || '')}</div>
           </div>
           <div class="trade-badges">
@@ -2673,7 +2694,7 @@ function renderCoreClosedList() {
       <div class="trade-card animate-fade-up">
         <div class="trade-header">
           <div>
-            <div class="trade-symbol">${escapeHtml(item.symbol)}</div>
+            <div class="trade-symbol-row"><div class="trade-symbol">${escapeHtml(item.symbol)}</div>${tvBtn(item.symbol)}</div>
             ${item.tradeName ? `<div class="trade-name">${escapeHtml(item.tradeName)}</div>` : ''}
           </div>
           <div class="trade-badges">
@@ -3422,7 +3443,7 @@ function renderPriority() {
         <div class="trade-card">
           <div class="trade-header">
             <div>
-              <div class="trade-symbol">${escapeHtml(p.symbol)}</div>
+              <div class="trade-symbol-row"><div class="trade-symbol">${escapeHtml(p.symbol)}</div>${tvBtn(p.symbol)}</div>
               <div class="trade-name">${escapeHtml(p.setup || '')}</div>
             </div>
             <div class="trade-badges">
@@ -3572,7 +3593,7 @@ function renderWatchlist() {
         <div class="trade-card">
           <div class="trade-header">
             <div>
-              <div class="trade-symbol">${escapeHtml(s.symbol)}</div>
+              <div class="trade-symbol-row"><div class="trade-symbol">${escapeHtml(s.symbol)}</div>${tvBtn(s.symbol)}</div>
               ${s.notes ? `<div class="trade-name">${escapeHtml(s.notes)}</div>` : ''}
             </div>
             <div class="trade-badges">
