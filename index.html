@@ -1735,10 +1735,24 @@ const DEFAULT_STATE = {
     ai: {
       provider: 'gemini',
       keys: { gemini: '', openrouter: '' },
-      models: { gemini: 'gemini-2.5-flash', openrouter: 'deepseek/deepseek-r1:free' }
+      models: { gemini: 'gemini-2.5-flash', openrouter: 'deepseek/deepseek-r1:free' },
+      businessPrompt: ''  // empty = use AI_DEFAULT_BUSINESS_PROMPT
     }
   }
 };
+
+// Default Business Analysis prompt. {stock} is replaced with the user's input.
+const AI_DEFAULT_BUSINESS_PROMPT = `Give a structured business analysis of {stock} (Indian listed company if applicable). Cover, with short headings:
+1. What the business does (segments / revenue mix)
+2. Industry & where it sits in the value chain
+3. Competitive moat & key competitors
+4. Growth drivers / tailwinds
+5. Key risks & headwinds
+6. Bull case (3 bullets)
+7. Bear case (3 bullets)
+8. One-line summary
+
+Keep it tight and practical for a trader/investor. Note that you don't have live financial data.`;
 
 // Curated best free models from each provider (finance-friendly defaults)
 const AI_MODELS = {
@@ -1905,7 +1919,8 @@ function normalizeState(s) {
       gemini: 'gemini-2.5-flash',
       openrouter: 'deepseek/deepseek-r1:free',
       ...(savedAi.models || {})
-    }
+    },
+    businessPrompt: typeof savedAi.businessPrompt === 'string' ? savedAi.businessPrompt : ''
   };
   merged.trades.forEach(t => { if (!Array.isArray(t.tags)) t.tags = []; });
   return merged;
@@ -4708,16 +4723,52 @@ async function aiSendChat() {
 
 /* ----- Business Analysis (fixed prompt, user supplies symbol) ----- */
 function aiBusinessHTML() {
+  const custom = (state.settings.ai.businessPrompt || '').trim();
   return `
     ${aiNoKeyBanner()}
-    <p class="section-panel-desc" style="margin-top:0">Enter a stock/company name or symbol. The app sends a standard deep-dive prompt and returns a full business analysis.</p>
+    <p class="section-panel-desc" style="margin-top:0">Enter a stock/company name or symbol. The app sends your default deep-dive prompt and returns a full business analysis.</p>
     <div class="ai-input-bar" style="margin-bottom:6px">
       <input type="text" id="aiBizInput" placeholder="e.g. RELIANCE, HDFC Bank, INFY" onkeydown="if(event.key==='Enter') aiAnalyzeBusiness()">
       <button class="ai-icon-sm ai-send-btn" onclick="aiAnalyzeBusiness()" title="Analyze">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       </button>
     </div>
+    <button class="btn btn-ghost btn-sm" style="margin-bottom:8px" onclick="editBusinessPromptModal()">✎ Edit default prompt${custom ? ' (custom)' : ''}</button>
     <div id="aiBizResult"></div>`;
+}
+
+function editBusinessPromptModal() {
+  const current = (state.settings.ai.businessPrompt || '').trim() || AI_DEFAULT_BUSINESS_PROMPT;
+  showModal({
+    title: 'Business Analysis Prompt',
+    body: `
+      <p style="margin:0 0 10px;font-size:13px;color:var(--text-muted);">This prompt is sent every time you run Business Analysis. Use <span class="mono" style="color:var(--primary);">{stock}</span> where the stock name should be inserted.</p>
+      <textarea class="form-textarea mono" id="bizPromptInput" rows="12" style="font-size:13px;">${escapeHtml(current)}</textarea>
+    `,
+    footer: `
+      <button class="btn btn-secondary" onclick="resetBusinessPrompt()">Reset to default</button>
+      <button class="btn" id="saveBizPromptBtn">Save</button>
+    `
+  });
+  document.getElementById('saveBizPromptBtn').onclick = async () => {
+    const val = (document.getElementById('bizPromptInput').value || '').trim();
+    if (val && !val.includes('{stock}') && !val.includes('{symbol}')) {
+      return showToast('Include {stock} so the stock name can be inserted', 'error');
+    }
+    // If identical to default, store empty so it tracks future default changes
+    state.settings.ai.businessPrompt = (val === AI_DEFAULT_BUSINESS_PROMPT.trim()) ? '' : val;
+    await saveState();
+    closeModal();
+    showToast('Prompt saved', 'success');
+    renderAI();
+  };
+}
+async function resetBusinessPrompt() {
+  state.settings.ai.businessPrompt = '';
+  await saveState();
+  closeModal();
+  showToast('Reset to default prompt', 'success');
+  renderAI();
 }
 async function aiAnalyzeBusiness() {
   if (aiBusy) return;
@@ -4729,17 +4780,8 @@ async function aiAnalyzeBusiness() {
   aiBusy = true;
   out.innerHTML = `<div class="ai-result ai-bubble thinking">Analyzing ${escapeHtml(symbol)}…</div>`;
   const system = "You are an equity research analyst. Produce a clear, structured business analysis. Use plain text with short headed sections. Be balanced and note you lack live financials.";
-  const prompt = `Give a structured business analysis of ${symbol} (Indian listed company if applicable). Cover, with short headings:
-1. What the business does (segments / revenue mix)
-2. Industry & where it sits in the value chain
-3. Competitive moat & key competitors
-4. Growth drivers / tailwinds
-5. Key risks & headwinds
-6. Bull case (3 bullets)
-7. Bear case (3 bullets)
-8. One-line summary
-
-Keep it tight and practical for a trader/investor. Note that you don't have live financial data.`;
+  const tmpl = (state.settings.ai.businessPrompt || '').trim() || AI_DEFAULT_BUSINESS_PROMPT;
+  const prompt = tmpl.split('{stock}').join(symbol).split('{symbol}').join(symbol);
   try {
     const reply = await callAI(system, [{ role: 'user', text: prompt }]);
     out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
