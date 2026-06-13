@@ -1298,6 +1298,61 @@ table.data-table tr:last-child td { border-bottom: none; }
   font-family: var(--font-mono);
   font-size: 12px;
 }
+
+/* ---- Rules feature ---- */
+.rules-mgmt-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.rules-mgmt-row .form-input { flex: 1; margin-bottom: 0; }
+.rule-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; background: var(--surface-3); border-radius: 8px; margin-bottom: 6px; font-size: 13px;
+}
+.rule-item-name { font-weight: 500; color: var(--text); }
+.rule-delete-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-subtle);
+  padding: 4px 6px; border-radius: 4px; font-size: 14px; line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.rule-delete-btn:hover { color: var(--error); background: var(--error-bg); }
+.rule-analytics-card {
+  background: var(--surface-3); border: 1px solid var(--border-subtle);
+  border-radius: 10px; padding: 14px 14px 12px; margin-bottom: 8px;
+}
+.rule-card-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+.rule-split {
+  display: grid; grid-template-columns: 1fr 1px 1fr; gap: 0; align-items: start;
+}
+.rule-side { padding: 0 12px; text-align: center; }
+.rule-side:first-child { padding-left: 0; }
+.rule-side:last-child { padding-right: 0; }
+.rule-divider { width: 1px; background: var(--border-subtle); align-self: stretch; min-height: 60px; }
+.rule-side-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--text-subtle); margin-bottom: 6px; font-weight: 500;
+}
+.rule-count {
+  font-size: 24px; font-weight: 700; font-family: var(--font-mono); color: var(--text); margin-bottom: 5px;
+}
+.rule-result-pill {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-family: var(--font-mono); font-weight: 600;
+}
+.rule-result-pill.positive { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.rule-result-pill.negative { background: var(--error-bg); color: var(--error); border: 1px solid var(--error-border); }
+.rule-result-pill.neutral { background: var(--surface-4); color: var(--text-muted); border: 1px solid var(--border); }
+.rules-checklist { display: flex; flex-direction: column; gap: 6px; }
+.rule-check-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  background: var(--surface-3); border-radius: 8px;
+}
+.rule-check-name { flex: 1; font-size: 13px; color: var(--text); }
+.rule-choice-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.rule-choice-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface-4); color: var(--text-muted); font-size: 11px;
+  font-weight: 600; cursor: pointer; transition: all 0.15s; letter-spacing: 0.02em;
+}
+.rule-choice-btn.active-followed { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.rule-choice-btn.active-not { background: var(--error-bg); border-color: var(--error-border); color: var(--error); }
 </style>
 </head>
 <body>
@@ -1421,6 +1476,7 @@ const DEFAULT_STATE = {
   watchlists: [{ id: 'w1', name: 'Default', symbols: [] }],
   strategies: [],
   journalNotes: {},
+  rules: [],
   settings: {
     exchange: 'NSE',
     autoRefresh: false,
@@ -1519,6 +1575,7 @@ function normalizeState(s) {
   if (Array.isArray(s.watchlists) && s.watchlists.length) merged.watchlists = s.watchlists;
   if (Array.isArray(s.strategies)) merged.strategies = s.strategies;
   if (s.journalNotes && typeof s.journalNotes === 'object') merged.journalNotes = s.journalNotes;
+  if (Array.isArray(s.rules)) merged.rules = s.rules;
   if (s.settings && typeof s.settings === 'object') merged.settings = { ...merged.settings, ...s.settings };
   // Ensure trades have tags arrays
   merged.trades.forEach(t => { if (!Array.isArray(t.tags)) t.tags = []; });
@@ -2715,8 +2772,10 @@ let entryState = {
   portfolioType: 'satellite',
   category: 'stocks',
   entryChart: null,
-  tags: []
+  tags: [],
+  ruleTags: {}
 };
+let closeRuleTags = {};
 
 function renderEntry() {
   document.getElementById('panel-entry').innerHTML = `
@@ -2797,6 +2856,21 @@ function renderEntry() {
         <input class="form-input" id="ef-tag" placeholder="Type a tag and press Enter">
       </div>
 
+      ${state.rules.length > 0 ? `
+      <div class="form-group">
+        <label class="form-label">Rules <span style="color: var(--text-subtle); text-transform: none; letter-spacing: 0; font-weight: 400;">— Plan: which rules will you follow?</span></label>
+        <div class="rules-checklist">
+          ${state.rules.map(r => `
+            <div class="rule-check-row" data-rule="${r.id}">
+              <span class="rule-check-name">${escapeHtml(r.name)}</span>
+              <div class="rule-choice-btns">
+                <button class="rule-choice-btn ${entryState.ruleTags[r.id] === 'followed' ? 'active-followed' : ''}" data-choice="followed" onclick="toggleEntryRuleTag('${r.id}','followed')">✓ Yes</button>
+                <button class="rule-choice-btn ${entryState.ruleTags[r.id] === 'notfollowed' ? 'active-not' : ''}" data-choice="notfollowed" onclick="toggleEntryRuleTag('${r.id}','notfollowed')">✗ No</button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
       <div class="btn-row" style="margin-top: 20px;">
         <button class="btn btn-lg" onclick="submitEntry()">Add Trade</button>
         <button class="btn btn-secondary" onclick="resetEntry()">Reset</button>
@@ -2836,7 +2910,7 @@ function removeEntryTag(tag) {
 }
 
 function resetEntry() {
-  entryState = { portfolioType: 'satellite', category: 'stocks', entryChart: null, tags: [] };
+  entryState = { portfolioType: 'satellite', category: 'stocks', entryChart: null, tags: [], ruleTags: {} };
   renderEntry();
 }
 
@@ -2874,6 +2948,7 @@ async function submitEntry() {
       entryDesc,
       entryChart: entryState.entryChart,
       tags: [...entryState.tags],
+      ruleTagsEntry: { ...entryState.ruleTags },
       createdAt: new Date().toISOString()
     });
     await saveState();
@@ -2914,6 +2989,7 @@ function setupDropZone(zoneId, inputId, callback) {
 function openCloseTradeModal(tradeId) {
   const t = state.trades.find(x => x.id === tradeId);
   if (!t) return;
+  closeRuleTags = { ...(t.ruleTagsEntry || {}) };
   const defaultDate = nowDatetimeLocal();
   showModal({
     title: `Close Trade: ${t.symbol}`,
@@ -2944,6 +3020,22 @@ function openCloseTradeModal(tradeId) {
           <input type="file" id="dropInputClose" accept="image/*" style="display: none;">
         </div>
       </div>
+      ${state.rules.length > 0 ? `
+      <div class="form-group">
+        <label class="form-label">Rules <span style="color: var(--text-subtle); text-transform: none; letter-spacing: 0; font-weight: 400;">— Did you follow these rules?</span></label>
+        <div class="rules-checklist" id="closeRulesChecklist">
+          ${state.rules.map(r => {
+            const cur = (t.ruleTagsEntry || {})[r.id];
+            return `<div class="rule-check-row" data-rule="${r.id}">
+              <span class="rule-check-name">${escapeHtml(r.name)}</span>
+              <div class="rule-choice-btns">
+                <button class="rule-choice-btn ${cur === 'followed' ? 'active-followed' : ''}" data-choice="followed" onclick="toggleCloseRuleTag('${r.id}','followed')">✓ Yes</button>
+                <button class="rule-choice-btn ${cur === 'notfollowed' ? 'active-not' : ''}" data-choice="notfollowed" onclick="toggleCloseRuleTag('${r.id}','notfollowed')">✗ No</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : ''}
     `,
     footer: `
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -2978,6 +3070,7 @@ function openCloseTradeModal(tradeId) {
     t.exitChart = exitChart;
     t.realizedPnl = realizedPnl;
     t.commission = commission;
+    t.ruleTagsExit = { ...closeRuleTags };
     t.closedAt = new Date().toISOString();
     await saveState();
     closeModal();
@@ -3601,6 +3694,29 @@ function renderAnalytics() {
       <div class="card-header"><h3 class="card-title">By Category</h3></div>
       ${renderCategoryRows()}
     </div>
+
+    <div class="card" style="margin-top: 14px;">
+      <div class="card-header">
+        <h3 class="card-title">Rules</h3>
+        <span class="card-subtitle">Adherence & P&L impact</span>
+      </div>
+      <div class="rules-mgmt-row">
+        <input class="form-input" id="newRuleInput" placeholder="e.g. Respect stop loss" maxlength="80" onkeydown="if(event.key==='Enter') addRule()">
+        <button class="btn" style="padding: 0 16px; white-space: nowrap;" onclick="addRule()">+ Add Rule</button>
+      </div>
+      <div id="rulesList">
+        ${state.rules.map(r => `
+          <div class="rule-item" id="ri-${r.id}">
+            <span class="rule-item-name">${escapeHtml(r.name)}</span>
+            <button class="rule-delete-btn" onclick="deleteRule('${r.id}')" title="Delete rule">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>`).join('')}
+      </div>
+      <div id="rulesAnalytics" style="margin-top: ${state.rules.length > 0 ? '14px' : '0'}">
+        ${renderRulesAnalytics()}
+      </div>
+    </div>
   `;
 
   drawEquityCurve();
@@ -3654,6 +3770,99 @@ function renderCategoryRows() {
       }).join('')}
     </tbody>
   </table></div>`;
+}
+
+/* ========================================================================
+   RULES
+   ======================================================================== */
+function renderRulesAnalytics() {
+  if (state.rules.length === 0) {
+    return `<p style="color: var(--text-subtle); font-size: 13px; text-align: center; padding: 12px 0; margin: 0;">
+      Add rules above to start tracking adherence and P&amp;L impact.
+    </p>`;
+  }
+  const allClosed = [
+    ...state.trades.filter(t => t.status === 'closed'),
+    ...(state.coreClosed || [])
+  ];
+  return state.rules.map(rule => {
+    const followed = allClosed.filter(t => t.ruleTagsExit && t.ruleTagsExit[rule.id] === 'followed');
+    const notFollowed = allClosed.filter(t => t.ruleTagsExit && t.ruleTagsExit[rule.id] === 'notfollowed');
+    const followedPnl = followed.reduce((s, t) => s + netPnl(t), 0);
+    const notPnl = notFollowed.reduce((s, t) => s + netPnl(t), 0);
+    const fClass = followed.length === 0 ? 'neutral' : followedPnl >= 0 ? 'positive' : 'negative';
+    const nClass = notFollowed.length === 0 ? 'neutral' : notPnl >= 0 ? 'positive' : 'negative';
+    return `
+      <div class="rule-analytics-card">
+        <div class="rule-card-name">${escapeHtml(rule.name)}</div>
+        <div class="rule-split">
+          <div class="rule-side">
+            <div class="rule-side-label">Followed</div>
+            <div class="rule-count">${followed.length}</div>
+            <span class="rule-result-pill ${fClass}">${followed.length === 0 ? '—' : formatPnl(followedPnl)}</span>
+          </div>
+          <div class="rule-divider"></div>
+          <div class="rule-side">
+            <div class="rule-side-label">Not Followed</div>
+            <div class="rule-count">${notFollowed.length}</div>
+            <span class="rule-result-pill ${nClass}">${notFollowed.length === 0 ? '—' : formatPnl(notPnl)}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function addRule() {
+  const input = document.getElementById('newRuleInput');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) return showToast('Enter a rule name', 'error');
+  if (state.rules.some(r => r.name.toLowerCase() === name.toLowerCase())) {
+    return showToast('Rule already exists', 'warning');
+  }
+  state.rules.push({ id: generateId(), name, createdAt: new Date().toISOString() });
+  await saveState();
+  renderAnalytics();
+  showToast('Rule added', 'success');
+}
+
+async function deleteRule(ruleId) {
+  state.rules = state.rules.filter(r => r.id !== ruleId);
+  await saveState();
+  renderAnalytics();
+  showToast('Rule deleted', 'success');
+}
+
+function toggleEntryRuleTag(ruleId, choice) {
+  if (entryState.ruleTags[ruleId] === choice) {
+    delete entryState.ruleTags[ruleId];
+  } else {
+    entryState.ruleTags[ruleId] = choice;
+  }
+  const row = document.querySelector(`.rule-check-row[data-rule="${ruleId}"]`);
+  if (!row) return;
+  row.querySelectorAll('.rule-choice-btn').forEach(btn => {
+    btn.classList.remove('active-followed', 'active-not');
+    if (entryState.ruleTags[ruleId] === btn.dataset.choice) {
+      btn.classList.add(btn.dataset.choice === 'followed' ? 'active-followed' : 'active-not');
+    }
+  });
+}
+
+function toggleCloseRuleTag(ruleId, choice) {
+  if (closeRuleTags[ruleId] === choice) {
+    delete closeRuleTags[ruleId];
+  } else {
+    closeRuleTags[ruleId] = choice;
+  }
+  const row = document.querySelector(`#closeRulesChecklist .rule-check-row[data-rule="${ruleId}"]`);
+  if (!row) return;
+  row.querySelectorAll('.rule-choice-btn').forEach(btn => {
+    btn.classList.remove('active-followed', 'active-not');
+    if (closeRuleTags[ruleId] === btn.dataset.choice) {
+      btn.classList.add(btn.dataset.choice === 'followed' ? 'active-followed' : 'active-not');
+    }
+  });
 }
 
 function drawEquityCurve() {
