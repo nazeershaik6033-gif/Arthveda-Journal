@@ -7,9 +7,37 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
 <meta name="apple-mobile-web-app-title" content="Naz Trades">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='3' width='20' height='26' rx='2' fill='%23000' stroke='%23fff' stroke-width='1'/><circle cx='6.5' cy='6' r='1' fill='%23fff'/><circle cx='6.5' cy='10' r='1' fill='%23fff'/><circle cx='6.5' cy='14' r='1' fill='%23fff'/><circle cx='6.5' cy='18' r='1' fill='%23fff'/><circle cx='6.5' cy='22' r='1' fill='%23fff'/><text x='14' y='13' font-size='7' font-weight='bold' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Trading</text><text x='14' y='19' font-size='6' font-weight='600' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Journal</text></svg>" type="image/svg+xml">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect x='30' y='20' width='120' height='140' rx='10' fill='%23000' stroke='%23fff' stroke-width='3'/><circle cx='45' cy='35' r='6' fill='%23fff'/><circle cx='45' cy='60' r='6' fill='%23fff'/><circle cx='45' cy='85' r='6' fill='%23fff'/><circle cx='45' cy='110' r='6' fill='%23fff'/><circle cx='45' cy='135' r='6' fill='%23fff'/><text x='90' y='75' font-size='32' font-weight='bold' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Trading</text><text x='90' y='110' font-size='28' font-weight='600' fill='%23fff' text-anchor='middle' dominant-baseline='middle' font-family='Arial'>Journal</text></svg>" type="image/svg+xml">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%230f172a'/><path d='M 12,52 L 12,12 L 52,52 L 52,12' stroke='%23e2e8f0' stroke-width='8' fill='none' stroke-linecap='butt' stroke-linejoin='miter'/><line x1='6' y1='60' x2='54' y2='10' stroke='%2322c55e' stroke-width='4.5' stroke-linecap='round'/><path d='M 58,6 L 46,10 L 51,20 Z' fill='%2322c55e'/></svg>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='30' fill='%230f172a'/><path d='M 35,157 L 35,35 L 157,157 L 157,35' stroke='%23e2e8f0' stroke-width='24' fill='none' stroke-linecap='butt' stroke-linejoin='miter'/><line x1='18' y1='180' x2='162' y2='30' stroke='%2322c55e' stroke-width='13.5' stroke-linecap='round'/><path d='M 174,18 L 138,30 L 153,60 Z' fill='%2322c55e'/></svg>" type="image/svg+xml">
 <meta name="description" content="Naz Trades — offline trading journal for Indian traders">
+<script>
+(function(){
+  var svg192 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="30" fill="#0f172a"/><path d="M 35,157 L 35,35 L 157,157 L 157,35" stroke="#e2e8f0" stroke-width="24" fill="none" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="18" y1="180" x2="162" y2="30" stroke="#22c55e" stroke-width="13.5" stroke-linecap="round"/><path d="M 174,18 L 138,30 L 153,60 Z" fill="#22c55e"/></svg>';
+  var svg512 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#0f172a"/><path d="M 93,419 L 93,93 L 419,419 L 419,93" stroke="#e2e8f0" stroke-width="64" fill="none" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="48" y1="480" x2="432" y2="80" stroke="#22c55e" stroke-width="36" stroke-linecap="round"/><path d="M 464,48 L 368,80 L 408,160 Z" fill="#22c55e"/></svg>';
+  var manifest = {
+    name: 'Naz Trades',
+    short_name: 'Naz Trades',
+    description: 'Offline trading journal for Indian traders',
+    start_url: '.',
+    display: 'standalone',
+    orientation: 'portrait',
+    theme_color: '#0f172a',
+    background_color: '#0f172a',
+    icons: [
+      { src: 'data:image/svg+xml,' + encodeURIComponent(svg192), type: 'image/svg+xml', sizes: '192x192', purpose: 'any maskable' },
+      { src: 'data:image/svg+xml,' + encodeURIComponent(svg512), type: 'image/svg+xml', sizes: '512x512', purpose: 'any maskable' }
+    ]
+  };
+  try {
+    var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = url;
+    document.head.appendChild(link);
+  } catch(e) {}
+})();
+</script>
 <title>Naz Trades</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -234,12 +262,19 @@ input[type=range].font-slider::-moz-range-thumb {
   letter-spacing: -0.01em;
 }
 .brand-logo {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.28), 0 0 0 1px rgba(99,102,241,0.18);
+}
+html.light .brand-logo {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.14), 0 0 0 1px rgba(99,102,241,0.22);
 }
 .tabs-bar {
   display: flex;
@@ -1372,6 +1407,12 @@ table.data-table tr:last-child td { border-bottom: none; }
         <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
+      <button class="icon-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle theme">
+        <!-- sun icon (shown in dark mode) -->
+        <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <!-- moon icon (shown in light mode) -->
+        <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
     </div>
   </div>
   <div class="market-banner">
@@ -1568,7 +1609,41 @@ async function loadState() {
 function normalizeState(s) {
   const merged = JSON.parse(JSON.stringify(DEFAULT_STATE));
   if (!s || typeof s !== 'object') return merged;
-  if (Array.isArray(s.trades)) merged.trades = s.trades;
+
+  // Handle MyTrades nested format: trades = { live: {stocks,futures,options}, closed: {stocks,futures,options} }
+  if (s.trades && !Array.isArray(s.trades) && (s.trades.live || s.trades.closed)) {
+    const catMap = { stocks: 'stocks', futures: 'futures', options: 'options' };
+    const convertMyTrade = (mt, status) => ({
+      id: mt.id || generateId(),
+      portfolioType: 'satellite',
+      status,
+      category: catMap[mt.cat] || 'stocks',
+      symbol: (mt.before && mt.before.symbol) || (mt.after && mt.after.symbol) || '',
+      tradeName: (mt.before && mt.before.name) || '',
+      entryPrice: mt.before ? Number(mt.before.price) || 0 : 0,
+      entryQty: mt.before ? Number(mt.before.qty) || 0 : 0,
+      entryDate: (mt.before && mt.before.datetime) || mt.addedAt || new Date().toISOString(),
+      entryDesc: (mt.before && mt.before.description) || '',
+      entryChart: (mt.before && mt.before.image) || null,
+      exitPrice: mt.after ? Number(mt.after.price) || null : null,
+      exitQty: mt.after ? Number(mt.after.qty) || null : null,
+      exitDate: (mt.after && mt.after.datetime) || mt.closedAt || null,
+      exitDesc: (mt.after && mt.after.description) || '',
+      exitChart: (mt.after && mt.after.image) || null,
+      realizedPnl: mt.after ? Number(mt.after.pl) || null : null,
+      closedAt: mt.closedAt || null,
+      tags: Array.isArray(mt.tags) ? mt.tags : ['mytrades-import'],
+      createdAt: mt.createdAt || new Date().toISOString()
+    });
+    const live = s.trades.live || {};
+    const closed = s.trades.closed || {};
+    const liveTrades = [...(live.stocks||[]), ...(live.futures||[]), ...(live.options||[])].map(t => convertMyTrade(t, 'open'));
+    const closedTrades = [...(closed.stocks||[]), ...(closed.futures||[]), ...(closed.options||[])].map(t => convertMyTrade(t, 'closed'));
+    merged.trades = [...liveTrades, ...closedTrades];
+  } else if (Array.isArray(s.trades)) {
+    merged.trades = s.trades;
+  }
+
   if (Array.isArray(s.portfolio)) merged.portfolio = s.portfolio;
   if (Array.isArray(s.coreClosed)) merged.coreClosed = s.coreClosed;
   if (Array.isArray(s.priority)) merged.priority = s.priority;
@@ -1577,7 +1652,6 @@ function normalizeState(s) {
   if (s.journalNotes && typeof s.journalNotes === 'object') merged.journalNotes = s.journalNotes;
   if (Array.isArray(s.rules)) merged.rules = s.rules;
   if (s.settings && typeof s.settings === 'object') merged.settings = { ...merged.settings, ...s.settings };
-  // Ensure trades have tags arrays
   merged.trades.forEach(t => { if (!Array.isArray(t.tags)) t.tags = []; });
   return merged;
 }
@@ -3083,6 +3157,9 @@ function openCloseTradeModal(tradeId) {
 function openEditTradeModal(tradeId) {
   const t = state.trades.find(x => x.id === tradeId);
   if (!t) return;
+  let newEntryChart = t.entryChart || null;
+  let newExitChart = t.exitChart || null;
+
   showModal({
     title: `Edit Trade: ${t.symbol}`,
     body: `
@@ -3095,13 +3172,89 @@ function openEditTradeModal(tradeId) {
         <div class="form-group"><label class="form-label">Entry Qty</label><input class="form-input mono" id="et-qty" type="number" step="1" value="${t.entryQty}"></div>
         <div class="form-group"><label class="form-label">Entry Date</label><input class="form-input mono" id="et-date" type="datetime-local" value="${(t.entryDate || '').slice(0,16)}"></div>
       </div>
-      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="et-desc" rows="3">${escapeHtml(t.entryDesc || '')}</textarea></div>
+      <div class="form-group"><label class="form-label">Entry Notes</label><textarea class="form-textarea" id="et-desc" rows="3">${escapeHtml(t.entryDesc || '')}</textarea></div>
+      ${t.status === 'closed' ? `
+      <div style="border-top: 1px solid var(--border); margin: 8px 0 16px; padding-top: 16px;">
+        <div style="font-size: 11px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;">Exit Details</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Exit Price ₹</label><input class="form-input mono" id="et-exit-price" type="number" step="0.01" value="${t.exitPrice || ''}"></div>
+          <div class="form-group"><label class="form-label">Exit Qty</label><input class="form-input mono" id="et-exit-qty" type="number" step="1" value="${t.exitQty || ''}"></div>
+          <div class="form-group"><label class="form-label">Exit Date</label><input class="form-input mono" id="et-exit-date" type="datetime-local" value="${(t.exitDate || t.closedAt || '').slice(0,16)}"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Realized P&L ₹</label><input class="form-input mono" id="et-pnl" type="number" step="0.01" value="${t.realizedPnl != null ? t.realizedPnl : ''}"></div>
+        <div class="form-group"><label class="form-label">Exit Notes</label><textarea class="form-textarea" id="et-exit-desc" rows="2">${escapeHtml(t.exitDesc || '')}</textarea></div>
+      </div>` : ''}
+      <div class="form-group">
+        <label class="form-label">Before Chart (Entry)</label>
+        <div id="et-entry-container"></div>
+        <input type="file" id="et-entry-input" accept="image/*" style="display:none;">
+      </div>
+      ${t.status === 'closed' ? `
+      <div class="form-group">
+        <label class="form-label">After Chart (Exit)</label>
+        <div id="et-exit-container"></div>
+        <input type="file" id="et-exit-input" accept="image/*" style="display:none;">
+      </div>` : ''}
     `,
     footer: `
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn" id="saveEditBtn">Save</button>
     `
   });
+
+  function renderEditChart(which) {
+    const src = which === 'entry' ? newEntryChart : newExitChart;
+    const container = document.getElementById(`et-${which}-container`);
+    if (!container) return;
+    if (src) {
+      container.innerHTML = `
+        <img src="${src}" style="width:100%; max-height:160px; object-fit:cover; border-radius:8px; cursor:pointer; display:block;" id="et-${which}-thumb">
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-secondary" style="flex:1; font-size:12px; padding:6px 10px;" id="et-${which}-replace">⬆ Replace</button>
+          <button class="btn btn-secondary" style="font-size:12px; padding:6px 10px; color:var(--error); border-color:var(--error);" id="et-${which}-delete">✕ Delete</button>
+        </div>`;
+      document.getElementById(`et-${which}-thumb`).onclick = () => openImageLightbox(which === 'entry' ? newEntryChart : newExitChart);
+      document.getElementById(`et-${which}-replace`).onclick = () => document.getElementById(`et-${which}-input`).click();
+      document.getElementById(`et-${which}-delete`).onclick = () => {
+        if (which === 'entry') newEntryChart = null; else newExitChart = null;
+        renderEditChart(which);
+      };
+    } else {
+      container.innerHTML = `
+        <div class="drop-zone" id="et-${which}-zone">
+          <div><div style="font-size:24px; opacity:0.4;">📊</div><div style="margin-top:4px; font-size:13px; color:var(--text-muted);">Click or drag to add chart image</div></div>
+        </div>`;
+      const zone = document.getElementById(`et-${which}-zone`);
+      zone.onclick = () => document.getElementById(`et-${which}-input`).click();
+      zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
+      zone.ondragleave = () => zone.classList.remove('dragover');
+      zone.ondrop = async (e) => {
+        e.preventDefault(); zone.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+          const b64 = await readFileAsBase64(file);
+          if (which === 'entry') newEntryChart = b64; else newExitChart = b64;
+          renderEditChart(which);
+        }
+      };
+    }
+    const input = document.getElementById(`et-${which}-input`);
+    if (input) {
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+          const b64 = await readFileAsBase64(file);
+          if (which === 'entry') newEntryChart = b64; else newExitChart = b64;
+          renderEditChart(which);
+          e.target.value = '';
+        }
+      };
+    }
+  }
+
+  renderEditChart('entry');
+  if (t.status === 'closed') renderEditChart('exit');
+
   document.getElementById('saveEditBtn').onclick = async () => {
     t.symbol = (document.getElementById('et-symbol').value || '').toUpperCase().trim();
     t.tradeName = document.getElementById('et-name').value.trim();
@@ -3110,6 +3263,19 @@ function openEditTradeModal(tradeId) {
     const dt = document.getElementById('et-date').value;
     if (dt) t.entryDate = new Date(dt).toISOString();
     t.entryDesc = document.getElementById('et-desc').value;
+    if (t.status === 'closed') {
+      const ep = parseFloat(document.getElementById('et-exit-price').value);
+      if (!isNaN(ep) && ep > 0) t.exitPrice = ep;
+      const eq = parseFloat(document.getElementById('et-exit-qty').value);
+      if (!isNaN(eq) && eq > 0) t.exitQty = eq;
+      const ed = document.getElementById('et-exit-date').value;
+      if (ed) { t.exitDate = new Date(ed).toISOString(); t.closedAt = t.exitDate; }
+      const pnl = parseFloat(document.getElementById('et-pnl').value);
+      if (!isNaN(pnl)) t.realizedPnl = pnl;
+      t.exitDesc = document.getElementById('et-exit-desc').value;
+      t.exitChart = newExitChart;
+    }
+    t.entryChart = newEntryChart;
     await saveState();
     closeModal();
     showToast('Trade updated', 'success');
@@ -4380,11 +4546,22 @@ async function restoreJsonFile(event) {
   try {
     const text = await file.text();
     const data = JSON.parse(text);
-    if (!data || !Array.isArray(data.trades)) {
-      return showToast('Invalid backup file (no trades array)', 'error');
+    const isMyTradesFormat = data && data.trades && !Array.isArray(data.trades) && (data.trades.live || data.trades.closed);
+    if (!data || (!Array.isArray(data.trades) && !isMyTradesFormat)) {
+      return showToast('Invalid backup file — expected Naz Trades or MyTrades JSON', 'error');
+    }
+    const isMyTrades = isMyTradesFormat;
+    let tradeCount = 0;
+    if (Array.isArray(data.trades)) {
+      tradeCount = data.trades.length;
+    } else if (isMyTrades) {
+      const t = data.trades;
+      ['stocks','futures','options'].forEach(c => {
+        tradeCount += ((t.live||{})[c]||[]).length + ((t.closed||{})[c]||[]).length;
+      });
     }
     const counts = {
-      trades: data.trades.length,
+      trades: tradeCount,
       portfolio: Array.isArray(data.portfolio) ? data.portfolio.length : 0,
       priority: Array.isArray(data.priority) ? data.priority.length : 0,
       watchlists: Array.isArray(data.watchlists) ? data.watchlists.length : 0,
@@ -4561,47 +4738,51 @@ async function importZerodhaTradebook(event) {
     let headerIdx = -1;
     for (let i = 0; i < rows.length; i++) {
       const lower = rows[i].map(c => String(c).toLowerCase());
-      if (lower.some(c => c.includes('symbol') || c.includes('tradingsymbol'))) {
-        headerIdx = i;
-        break;
-      }
+      if (lower.some(c => c.includes('symbol') || c.includes('tradingsymbol'))) { headerIdx = i; break; }
     }
     if (headerIdx === -1) return showToast('Could not find header row (looking for symbol/tradingsymbol column)', 'error');
 
     const header = rows[headerIdx].map(c => String(c).toLowerCase().trim());
     const symbolCol = header.findIndex(c => c === 'tradingsymbol' || c === 'symbol' || c.includes('symbol'));
-    const typeCol = header.findIndex(c => c.includes('trade_type') || c.includes('buy') || c.includes('side'));
-    const qtyCol = header.findIndex(c => c.includes('quantity') || c === 'qty');
-    const priceCol = header.findIndex(c => c.includes('price'));
+    const typeCol = header.findIndex(c =>
+      c === 'trade_type' || c === 'trade type' ||
+      c.includes('trade_type') || c.includes('trade type') ||
+      c.includes('transaction_type') || c.includes('transaction type') ||
+      c === 'type' || c === 'order type' || c.includes('buy/sell') || c.includes('side') || c.includes('action')
+    );
+    const qtyCol = header.findIndex(c => c.includes('quantity') || c === 'qty' || c === 'vol' || c.includes('volume'));
+    const priceCol = header.findIndex(c => c === 'price' || c === 'trade price' || c.includes('price'));
     const dateCol = header.findIndex(c => c.includes('date'));
 
     if (symbolCol < 0 || qtyCol < 0 || priceCol < 0 || typeCol < 0) {
-      return showToast('Missing required columns (symbol, trade_type, quantity, price)', 'error');
+      const missing = [];
+      if (symbolCol < 0) missing.push('symbol/tradingsymbol');
+      if (typeCol < 0) missing.push('trade_type / Trade Type');
+      if (qtyCol < 0) missing.push('quantity');
+      if (priceCol < 0) missing.push('price');
+      return showToast(`Missing columns: ${missing.join(', ')}. Found: ${header.filter(Boolean).join(', ')}`, 'error');
     }
 
-    // Group by symbol
-    const groups = {};
+    // Parse all individual rows grouped by symbol (preserve order)
+    const groupMap = {};
+    const groupOrder = [];
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const r = rows[i];
       const sym = String(r[symbolCol] || '').trim().toUpperCase();
       if (!sym) continue;
-      const type = String(r[typeCol] || '').trim().toUpperCase();
+      const rawType = String(r[typeCol] || '').trim().toUpperCase();
       const qty = parseFloat(r[qtyCol]) || 0;
       const price = parseFloat(r[priceCol]) || 0;
-      const date = r[dateCol] || '';
+      const date = dateCol >= 0 ? String(r[dateCol] || '').trim() : '';
       if (!qty || !price) continue;
-      if (!groups[sym]) groups[sym] = { symbol: sym, buyQty: 0, buyValue: 0, sellQty: 0, sellValue: 0, lastDate: '' };
-      if (type === 'BUY' || type === 'B') {
-        groups[sym].buyQty += qty;
-        groups[sym].buyValue += qty * price;
-      } else if (type === 'SELL' || type === 'S') {
-        groups[sym].sellQty += qty;
-        groups[sym].sellValue += qty * price;
-      }
-      if (date) groups[sym].lastDate = String(date);
+      const isBuy = rawType === 'BUY' || rawType === 'B' || rawType === 'BUY ORDER' || rawType.startsWith('BUY');
+      const isSell = rawType === 'SELL' || rawType === 'S' || rawType === 'SELL ORDER' || rawType.startsWith('SELL');
+      if (!isBuy && !isSell) continue;
+      if (!groupMap[sym]) { groupMap[sym] = { symbol: sym, rows: [] }; groupOrder.push(sym); }
+      groupMap[sym].rows.push({ date, type: isBuy ? 'BUY' : 'SELL', qty, price, checked: true });
     }
 
-    const symbols = Object.values(groups).filter(g => g.buyQty > 0);
+    const symbols = groupOrder.map(s => groupMap[s]).filter(g => g.rows.some(r => r.type === 'BUY'));
     if (!symbols.length) return showToast('No buy trades found in this file', 'error');
 
     symbols.forEach(g => {
@@ -4626,7 +4807,7 @@ async function importZerodhaTradebook(event) {
 
     const dupCount = symbols.filter(g => g.isDuplicate).length;
     showModal({
-      title: `Zerodha Import — ${symbols.length} symbol${symbols.length === 1 ? '' : 's'} found`,
+      title: `Zerodha Import — ${symbols.length} symbol${symbols.length === 1 ? '' : 's'}`,
       size: 'lg',
       body: `
         ${dupCount > 0 ? `<p style="color:var(--warning,#f59e0b);font-size:13px;margin:0 0 10px;padding:8px 10px;background:rgba(245,158,11,.1);border-radius:6px;">⚠️ ${dupCount} symbol${dupCount > 1 ? 's' : ''} already exist in your portfolio/trades and are set to <strong>Skip</strong> by default. Choose <em>Update existing</em> to merge tradebook data into the existing entry instead of creating a duplicate.</p>` : ''}
@@ -4667,6 +4848,8 @@ async function importZerodhaTradebook(event) {
       `,
       footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn" id="confirmZerodhaBtn">Import Selected</button>`
     });
+
+    window._zSymbols = symbols;
 
     document.getElementById('confirmZerodhaBtn').onclick = async () => {
       let imported = 0;
@@ -4788,6 +4971,41 @@ async function importZerodhaTradebook(event) {
   } catch (e) {
     showToast('Failed to parse Zerodha file: ' + e.message, 'error');
   }
+}
+
+function zerodhaToggleRow(gi, ri, checked) {
+  if (!window._zSymbols || !window._zSymbols[gi]) return;
+  window._zSymbols[gi].rows[ri].checked = checked;
+  const row = document.getElementById(`zr-${gi}-${ri}`);
+  if (row) row.style.opacity = checked ? '1' : '0.35';
+  zerodhaRefreshGroup(gi);
+}
+
+function zerodhaToggleAll(gi, checked) {
+  if (!window._zSymbols || !window._zSymbols[gi]) return;
+  const g = window._zSymbols[gi];
+  g.rows.forEach((r, ri) => {
+    r.checked = checked;
+    const row = document.getElementById(`zr-${gi}-${ri}`);
+    if (row) {
+      row.style.opacity = checked ? '1' : '0.35';
+      const cb = row.querySelector('input[type=checkbox]');
+      if (cb) cb.checked = checked;
+    }
+  });
+  zerodhaRefreshGroup(gi);
+}
+
+function zerodhaRefreshGroup(gi) {
+  if (!window._zSymbols || !window._zCalc || !window._zLiveHtml) return;
+  const g = window._zSymbols[gi];
+  const sum = window._zCalc(g);
+  const liveEl = document.getElementById(`zl-${gi}`);
+  if (liveEl) liveEl.innerHTML = window._zLiveHtml(sum);
+  const statusEl = document.getElementById(`zs-${gi}`);
+  if (statusEl) { statusEl.textContent = sum.status.toUpperCase(); statusEl.className = `badge ${sum.status === 'open' ? 'warning' : 'success'}`; }
+  const assignEl = document.getElementById(`za-${gi}`);
+  if (assignEl && assignEl.value !== 'skip') assignEl.value = sum.status === 'open' ? 'core' : 'satellite';
 }
 
 /* ========================================================================
