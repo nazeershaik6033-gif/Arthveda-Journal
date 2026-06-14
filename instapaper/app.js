@@ -1019,6 +1019,7 @@ function ArticleSheet({T,a,onAction,onClose}){
     h('div',{style:{padding:'6px 20px 12px',borderBottom:'1px solid '+T.hair}},
       h('div',{style:{fontFamily:"'Lora',Georgia,serif",fontSize:17,fontWeight:600,lineHeight:1.3}},a.title),
       h('div',{style:{fontSize:12.5,color:T.sub,marginTop:3}},a.source||'')),
+    h(ARow,{T,icon:Icons.checkCircle(21,(a.progress||0)>=0.97),label:(a.progress||0)>=0.97?(a.isVideo?'Mark as unwatched':'Mark as unread'):(a.isVideo?'Mark as watched':'Mark as read'),onClick:act('read')}),
     h(ARow,{T,icon:Icons.heart(21,a.liked),label:a.liked?'Unlike':'Like',onClick:act('like')}),
     h(ARow,{T,icon:Icons.archive(21),label:a.archived?'Move to Home':'Archive',onClick:act('archive')}),
     h(ARow,{T,icon:Icons.folder(21),label:'Move to folder…',onClick:act('move')}),
@@ -2444,6 +2445,7 @@ function App(){
     const a=byId(id);if(!a&&key!=='close')return;
     switch(key){
       case 'close':setReadingId(null);break;
+      case 'read':{const now=(a.progress||0)<0.97;patchArticle(id,{progress:now?1:0});toastFn(now?(a.isVideo?'Marked as watched':'Marked as read'):(a.isVideo?'Marked as unwatched':'Marked as unread'));setSheet(null);break}
       case 'like':patchArticle(id,x=>({liked:!x.liked}));break;
       case 'archive':{const now=!a.archived;patchArticle(id,{archived:now});toastFn(now?'Archived':'Moved to Home');setSheet(null);break}
       case 'move':setSheet({type:'move',ids:[id]});break;
