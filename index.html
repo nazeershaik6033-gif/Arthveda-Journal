@@ -343,7 +343,8 @@ html.light .brand-logo {
    the brand may shrink/ellipsize, and on narrow phones only the logo shows. */
 .header-brand { min-width: 0; flex-shrink: 1; }
 @media (max-width: 430px) {
-  .header-brand-name { display: none; }
+  .header-brand-name { font-size: 15px; }
+  .header-actions { gap: 2px; }
   .header-actions .icon-btn { width: 32px; height: 32px; }
 }
 
@@ -2285,9 +2286,27 @@ function switchTab(tabId) {
   // Reader runs standalone full-screen: hide the journal's header, banner and
   // dock so Instapaper takes over the whole viewport.
   document.body.classList.toggle('reader-active', tabId === 'reader');
+  // Match the iOS status-bar colour to whichever app is showing: Instapaper's
+  // theme while in the Reader, the journal's theme otherwise.
+  const tcMeta = document.querySelector('meta[name="theme-color"]');
+  if (tcMeta) {
+    if (tabId === 'reader' && window.__readerThemeColor) tcMeta.setAttribute('content', window.__readerThemeColor);
+    else if (tabId !== 'reader') tcMeta.setAttribute('content', (state.settings.theme || 'dark') === 'light' ? '#f1f5f9' : '#0f172a');
+  }
+  saveNav();
   renderActivePanel();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// Remember the current tab/scroll so returning from an external link (e.g. a
+// TradingView chart, which reloads this PWA) lands back where you were.
+function saveNav() {
+  try {
+    localStorage.setItem('naz_nav_v1', JSON.stringify({ tab: activeTab, subTrades: activeSubTab.trades, y: window.scrollY || 0 }));
+  } catch (e) {}
+}
+window.addEventListener('pagehide', saveNav);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNav(); });
 
 function openDrawer() {
   document.getElementById('drawer').classList.add('open');
@@ -2400,7 +2419,16 @@ function renderReader() {
 // return to the journal's home and restore the normal chrome.
 window.addEventListener('message', (e) => {
   const d = e.data;
-  if (d && d.type === 'arthveda-reader-back') switchTab('dashboard');
+  if (!d) return;
+  if (d.type === 'arthveda-reader-back') switchTab('dashboard');
+  // Instapaper reports its theme colour so the status bar can match it.
+  else if (d.type === 'instapaper-theme' && typeof d.color === 'string') {
+    window.__readerThemeColor = d.color;
+    if (activeTab === 'reader') {
+      const m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', d.color);
+    }
+  }
 });
 
 /* ========================================================================
@@ -6258,7 +6286,18 @@ async function init() {
   applyTheme();
   applyFonts();
   renderTabs();
-  switchTab('dashboard');
+  // Restore the last tab/scroll (e.g. after returning from a TradingView chart,
+  // which reloads this PWA); fall back to the Dashboard.
+  let savedNav = null;
+  try { savedNav = JSON.parse(localStorage.getItem('naz_nav_v1') || 'null'); } catch (e) {}
+  const validTab = savedNav && savedNav.tab && TABS.some(t => t.id === savedNav.tab);
+  if (validTab) {
+    if (savedNav.subTrades) activeSubTab.trades = savedNav.subTrades;
+    switchTab(savedNav.tab);
+    if (savedNav.y) setTimeout(() => window.scrollTo(0, savedNav.y), 140);
+  } else {
+    switchTab('dashboard');
+  }
   updateMarketStatus();
   setInterval(updateMarketStatus, 1000);
   setupAutoRefresh();
