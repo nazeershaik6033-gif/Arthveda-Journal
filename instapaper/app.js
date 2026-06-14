@@ -2061,6 +2061,8 @@ function App(){
     document.body.style.background=T.bg;
     const m=document.querySelector('meta[name="theme-color"]');
     if(m)m.setAttribute('content',T.statusbar);
+    // Tell the host app (Naz Trades) so the iOS status bar matches the reader theme.
+    if(EMBEDDED){try{window.parent.postMessage({type:'instapaper-theme',color:T.statusbar},'*')}catch(e){}}
   },[T]);
 
   useEffect(()=>{ // speech voices load async on most platforms
