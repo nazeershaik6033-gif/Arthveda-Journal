@@ -804,22 +804,61 @@ body.reader-active #panel-reader .reader-frame {
 .trade-badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .trade-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 18px;
   margin-bottom: 12px;
 }
+.trade-field {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
 .trade-field-label {
-  color: var(--text-subtle);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 .trade-field-value {
   font-family: var(--font-mono);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/* Trades filter/sort dropdowns */
+.ts-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.ts-dd { position: relative; }
+.ts-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 13px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.ts-btn:hover { border-color: var(--border); background: var(--surface-4); }
+.ts-btn.active { background: var(--primary-muted); color: var(--primary); border-color: var(--primary); }
+.ts-caret { font-size: 10px; opacity: 0.8; }
+.ts-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  min-width: 170px; max-height: 280px; overflow-y: auto;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+  animation: fadeIn 0.12s ease-out;
+}
+.ts-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left; background: transparent; border: none;
+  color: var(--text); font-family: inherit; font-size: 13px; font-weight: 500;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer;
+}
+.ts-item:hover { background: var(--surface-3); }
+.ts-item.active { background: var(--primary-muted); color: var(--primary); }
+.ts-backdrop { position: fixed; inset: 0; z-index: 30; background: transparent; }
 .trade-charts {
   display: flex;
   gap: 8px;
@@ -1862,7 +1901,7 @@ const AI_PROVIDER_META = {
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 let activeTab = 'dashboard';
 let activeSubTab = { trades: 'satellite-open', wl: 'w1' };
-let tradeFilter = { tag: null, sort: { key: 'date', dir: 'desc' } };
+let tradeFilter = { tags: [], openMenu: null, sort: { key: 'date', dir: 'desc' } };
 let calendarMonth = new Date();
 let calendarFilter = 'all';
 let journalView = 'daily';        // daily | monthly | calendar
@@ -3027,7 +3066,7 @@ function renderTradesContent(tags) {
   }
   const status = activeSubTab.trades === 'satellite-open' ? 'open' : 'closed';
   let trades = state.trades.filter(t => t.portfolioType === 'satellite' && t.status === status);
-  if (tradeFilter.tag) trades = trades.filter(t => (t.tags || []).includes(tradeFilter.tag));
+  if (tradeFilter.tags.length) trades = trades.filter(t => tradeFilter.tags.some(tag => (t.tags || []).includes(tag)));
 
   // Sort
   const sortKey = tradeFilter.sort.key, dir = tradeFilter.sort.dir === 'desc' ? -1 : 1;
@@ -3043,22 +3082,24 @@ function renderTradesContent(tags) {
 
   let html = '';
 
-  // Tag filters
-  if (tags.length) {
-    html += `<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center;">
-      <span style="color: var(--text-subtle); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px;">Filter:</span>
-      ${tags.map(t => `<span class="tag-filter ${tradeFilter.tag === t ? 'active' : ''}" onclick="setTagFilter('${escapeHtml(t)}')">${escapeHtml(t)}</span>`).join('')}
-      ${tradeFilter.tag ? `<button class="btn btn-ghost btn-sm" onclick="setTagFilter(null)">Clear</button>` : ''}
-    </div>`;
-  }
-
-  // Sort pills
-  html += `<div class="sort-pills">
-    <span style="color: var(--text-subtle); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; align-self: center; margin-right: 4px;">Sort:</span>
-    ${['date','pnl','symbol'].map(k => `
-      <span class="sort-pill ${tradeFilter.sort.key === k ? 'active' : ''}" onclick="setSortKey('${k}')">${k} ${tradeFilter.sort.key === k ? (tradeFilter.sort.dir === 'desc' ? '↓' : '↑') : ''}</span>
-    `).join('')}
-  </div>`;
+  // Filter + Sort — collapsed into two dropdowns
+  const sortLabel = { date: 'Date', pnl: 'P&L', symbol: 'Symbol' };
+  html += `<div class="ts-bar">
+    ${tags.length ? `<div class="ts-dd">
+      <button class="ts-btn ${tradeFilter.tags.length ? 'active' : ''}" onclick="toggleTradeMenu('filter')">Filter${tradeFilter.tags.length ? ' · ' + tradeFilter.tags.length : ''} <span class="ts-caret">▾</span></button>
+      ${tradeFilter.openMenu === 'filter' ? `<div class="ts-menu">
+        <button class="ts-item ${tradeFilter.tags.length === 0 ? 'active' : ''}" onclick="clearTradeTags()"><span>All</span>${tradeFilter.tags.length === 0 ? '<span>✓</span>' : ''}</button>
+        ${tags.map(t => `<button class="ts-item ${tradeFilter.tags.includes(t) ? 'active' : ''}" onclick="toggleTradeTag('${escapeHtml(t)}')"><span>${escapeHtml(t)}</span>${tradeFilter.tags.includes(t) ? '<span>✓</span>' : ''}</button>`).join('')}
+      </div>` : ''}
+    </div>` : ''}
+    <div class="ts-dd">
+      <button class="ts-btn" onclick="toggleTradeMenu('sort')">Sort · ${sortLabel[tradeFilter.sort.key]} ${tradeFilter.sort.dir === 'desc' ? '↓' : '↑'} <span class="ts-caret">▾</span></button>
+      ${tradeFilter.openMenu === 'sort' ? `<div class="ts-menu">
+        ${['date','pnl','symbol'].map(k => `<button class="ts-item ${tradeFilter.sort.key === k ? 'active' : ''}" onclick="setSortKey('${k}')"><span>${sortLabel[k]}</span>${tradeFilter.sort.key === k ? `<span>${tradeFilter.sort.dir === 'desc' ? '↓' : '↑'}</span>` : ''}</button>`).join('')}
+      </div>` : ''}
+    </div>
+  </div>
+  ${tradeFilter.openMenu ? `<div class="ts-backdrop" onclick="closeTradeMenus()"></div>` : ''}`;
 
   if (!trades.length) {
     html += `<div class="empty-state">
@@ -3073,10 +3114,18 @@ function renderTradesContent(tags) {
   container.innerHTML = html;
 }
 
-function setTagFilter(tag) { tradeFilter.tag = tag; renderTrades(); }
+function toggleTradeMenu(which) { tradeFilter.openMenu = tradeFilter.openMenu === which ? null : which; renderTrades(); }
+function closeTradeMenus() { tradeFilter.openMenu = null; renderTrades(); }
+function toggleTradeTag(tag) {
+  const i = tradeFilter.tags.indexOf(tag);
+  if (i >= 0) tradeFilter.tags.splice(i, 1); else tradeFilter.tags.push(tag);
+  renderTrades(); // keep the filter menu open for multi-select
+}
+function clearTradeTags() { tradeFilter.tags = []; renderTrades(); }
 function setSortKey(key) {
   if (tradeFilter.sort.key === key) tradeFilter.sort.dir = tradeFilter.sort.dir === 'desc' ? 'asc' : 'desc';
   else { tradeFilter.sort.key = key; tradeFilter.sort.dir = 'desc'; }
+  tradeFilter.openMenu = null; // sort is single-pick: close after choosing
   renderTrades();
 }
 
@@ -3101,16 +3150,16 @@ function renderTradeCard(t) {
       </div>
 
       <div class="trade-grid">
-        <div><div class="trade-field-label">Entry Price</div><div class="trade-field-value">${formatINR(t.entryPrice)}</div></div>
-        <div><div class="trade-field-label">Quantity</div><div class="trade-field-value">${escapeHtml(t.entryQty)}</div></div>
-        <div><div class="trade-field-label">Entry Date</div><div class="trade-field-value">${formatDate(t.entryDate, { day:'2-digit', month:'short', year:'2-digit' })}</div></div>
+        <div class="trade-field"><span class="trade-field-label">Entry Price</span><span class="trade-field-value">${formatINR(t.entryPrice)}</span></div>
+        <div class="trade-field"><span class="trade-field-label">Quantity</span><span class="trade-field-value">${escapeHtml(t.entryQty)}</span></div>
+        <div class="trade-field"><span class="trade-field-label">Entry Date</span><span class="trade-field-value">${formatDate(t.entryDate, { day:'2-digit', month:'short', year:'2-digit' })}</span></div>
         ${t.status === 'closed' ? `
-          <div><div class="trade-field-label">Exit Price</div><div class="trade-field-value">${formatINR(t.exitPrice)}</div></div>
-          <div><div class="trade-field-label">Exit Qty</div><div class="trade-field-value">${escapeHtml(t.exitQty)}</div></div>
-          <div><div class="trade-field-label">Closed</div><div class="trade-field-value">${formatDate(t.closedAt || t.exitDate, { day:'2-digit', month:'short', year:'2-digit' })}</div></div>
+          <div class="trade-field"><span class="trade-field-label">Exit Price</span><span class="trade-field-value">${formatINR(t.exitPrice)}</span></div>
+          <div class="trade-field"><span class="trade-field-label">Exit Qty</span><span class="trade-field-value">${escapeHtml(t.exitQty)}</span></div>
+          <div class="trade-field"><span class="trade-field-label">Closed</span><span class="trade-field-value">${formatDate(t.closedAt || t.exitDate, { day:'2-digit', month:'short', year:'2-digit' })}</span></div>
         ` : `
-          ${live ? `<div><div class="trade-field-label">Live Price</div><div class="trade-field-value">${formatINR(live.price)}</div></div>` : ''}
-          ${unrealized !== null ? `<div><div class="trade-field-label">Unrealized P&L</div><div class="trade-field-value ${pnlClass(unrealized)}">${formatPnl(unrealized)}</div></div>` : ''}
+          ${live ? `<div class="trade-field"><span class="trade-field-label">Live Price</span><span class="trade-field-value">${formatINR(live.price)}</span></div>` : ''}
+          ${unrealized !== null ? `<div class="trade-field"><span class="trade-field-label">Unrealized P&L</span><span class="trade-field-value ${pnlClass(unrealized)}">${formatPnl(unrealized)}</span></div>` : ''}
         `}
       </div>
 
