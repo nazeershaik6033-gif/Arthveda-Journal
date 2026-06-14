@@ -4171,6 +4171,7 @@ function renderWatchlist() {
       </div>
       <div class="btn-row">
         <button class="btn btn-secondary btn-sm" onclick="refreshAllPrices()">Refresh Prices</button>
+        <button class="btn btn-secondary btn-sm" onclick="importTradingViewPrompt()">↓ Import</button>
         <button class="btn btn-sm" onclick="newWatchlistPrompt()">+ New List</button>
       </div>
     </div>
@@ -4234,6 +4235,186 @@ function newWatchlistPrompt() {
     showToast('Watchlist created', 'success');
     renderActivePanel();
   };
+}
+
+/* ========================================================================
+   TRADINGVIEW IMPORT — link (public lists) or exported .txt / pasted text
+   ======================================================================== */
+function tvSym(tok) {
+  let s = String(tok || '').trim();
+  const m = s.match(/^([A-Za-z.]+):(.+)$/); // strip EXCHANGE: prefix
+  if (m) s = m[2];
+  s = s.toUpperCase().replace(/[^A-Z0-9&._-]/g, '');
+  if (!s || s.length > 20 || !/^[A-Z]/.test(s)) return '';
+  if (/^(HTTP|HTTPS|WWW|COM|JSON|HTML|SVG|PNG|JPG|CSS|API|GET|POST|UTF|DIV|SPAN)$/.test(s)) return '';
+  return s;
+}
+function tvParse(text) {
+  if (!text) return [];
+  const groups = [];
+  let cur = null;
+  const ensure = (name) => { cur = { section: (name || 'Imported').slice(0, 40), symbols: [] }; groups.push(cur); };
+  if (text.includes('###')) {
+    // TradingView export format: ###Section,EXCHANGE:SYMBOL,...
+    text.split(/[,\n\r]+/).map(t => t.trim()).filter(Boolean).forEach(tok => {
+      if (tok.startsWith('###')) ensure(tok.replace(/^#+/, '').trim());
+      else { const s = tvSym(tok); if (s) { if (!cur) ensure('Imported'); if (!cur.symbols.includes(s)) cur.symbols.push(s); } }
+    });
+  } else if (/[<{]/.test(text) && text.length > 400) {
+    // Fetched HTML/JSON from a link — extract EXCHANGE:SYMBOL tokens
+    const set = new Set();
+    const re = /\b([A-Z]{2,6}):([A-Z0-9][A-Z0-9&._-]{0,19})\b/g;
+    let m;
+    while ((m = re.exec(text)) && set.size < 800) { const s = tvSym(m[0]); if (s) set.add(s); }
+    if (set.size) { ensure('Imported from link'); cur.symbols = [...set]; }
+  } else {
+    ensure('Imported');
+    text.split(/[\s,]+/).map(t => t.trim()).filter(Boolean).forEach(tok => {
+      const s = tvSym(tok); if (s && !cur.symbols.includes(s)) cur.symbols.push(s);
+    });
+  }
+  return groups.filter(g => g.symbols.length);
+}
+async function tvFetchLink(url) {
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  const proxies = [
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+    u => 'https://r.jina.ai/' + u
+  ];
+  for (const p of proxies) {
+    try {
+      const res = await fetch(p(url));
+      if (res.ok) { const t = await res.text(); if (t && t.length > 80) return t; }
+    } catch (e) {}
+  }
+  throw new Error('fetch failed');
+}
+function tvProceed(text) {
+  const groups = tvParse(text);
+  const msg = document.getElementById('tv-msg');
+  if (!groups.length) { if (msg) msg.textContent = 'No symbols found. For private lists, use TradingView → Export watchlist and paste the text.'; return; }
+  tvShowConfirm(groups);
+}
+function importTradingViewPrompt() {
+  showModal({
+    title: 'Import from TradingView',
+    size: 'lg',
+    body: `
+      <div style="font-size:12.5px;color:var(--text-muted);line-height:1.5;margin-bottom:12px;">
+        Paste a <strong>public</strong> watchlist link, or use TradingView → watchlist menu → <strong>Export watchlist</strong> and paste/upload the file (this keeps your section names as categories).
+      </div>
+      <div class="form-group">
+        <label class="form-label">TradingView watchlist link</label>
+        <div style="display:flex;gap:6px;">
+          <input class="form-input" id="tv-link" placeholder="https://www.tradingview.com/watchlists/..." style="flex:1;min-width:0;">
+          <button class="btn btn-secondary btn-sm" id="tvFetchBtn" type="button">Fetch</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-subtle);margin-top:4px;">Only works for public/shared lists.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">…or paste / upload exported text</label>
+        <textarea class="form-textarea" id="tv-text" rows="5" placeholder="###Priority,NSE:RELIANCE,NSE:TCS,###Buying,NSE:INFY"></textarea>
+        <input type="file" id="tv-file" accept=".txt,text/plain" style="margin-top:8px;font-size:12px;">
+      </div>
+      <div id="tv-msg" style="font-size:12.5px;color:var(--error);min-height:16px;"></div>
+    `,
+    footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn" id="tvNextBtn">Continue</button>`
+  });
+  const msg = (t) => { const m = document.getElementById('tv-msg'); if (m) { m.style.color = 'var(--error)'; m.textContent = t; } };
+  document.getElementById('tvFetchBtn').onclick = async () => {
+    const url = document.getElementById('tv-link').value.trim();
+    if (!url) return msg('Enter a link first.');
+    const btn = document.getElementById('tvFetchBtn');
+    btn.textContent = 'Fetching…'; btn.disabled = true;
+    try { const text = await tvFetchLink(url); tvProceed(text); }
+    catch (e) { msg('Could not read that link (likely private or blocked). Use Export watchlist → paste instead.'); }
+    btn.textContent = 'Fetch'; btn.disabled = false;
+  };
+  document.getElementById('tv-file').onchange = (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { document.getElementById('tv-text').value = String(r.result || ''); };
+    r.readAsText(f);
+  };
+  document.getElementById('tvNextBtn').onclick = () => {
+    const text = document.getElementById('tv-text').value.trim();
+    if (!text) return msg('Paste a link and Fetch, or paste exported text.');
+    tvProceed(text);
+  };
+}
+function tvShowConfirm(groups) {
+  window.__tvImport = groups;
+  const body = groups.map((g, gi) => `
+    <div style="border:1px solid var(--border-subtle);border-radius:12px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+        <div style="font-weight:700;font-size:14px;">${escapeHtml(g.section)} <span style="color:var(--text-subtle);font-weight:500;">(${g.symbols.length})</span></div>
+        <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" class="tv-all" data-g="${gi}" checked> All</label>
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <select class="form-select" id="tv-dest-${gi}">
+          <option value="new">➕ New watchlist: ${escapeHtml(g.section)}</option>
+          ${state.watchlists.map(w => `<option value="wl:${w.id}">Watchlist: ${escapeHtml(w.name)}</option>`).join('')}
+          <option value="priority">Priority Setups</option>
+          <option value="skip">Skip this group</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${g.symbols.map(s => `<label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;background:var(--surface-3);border:1px solid var(--border-subtle);border-radius:999px;padding:5px 10px;cursor:pointer;" class="mono">
+          <input type="checkbox" class="tv-sym" data-g="${gi}" data-s="${escapeHtml(s)}" checked> ${escapeHtml(s)}</label>`).join('')}
+      </div>
+    </div>
+  `).join('');
+  showModal({
+    title: 'Confirm import',
+    size: 'lg',
+    body,
+    footer: `<button class="btn btn-secondary" onclick="importTradingViewPrompt()">Back</button><button class="btn" id="tvImportBtn">Import selected</button>`
+  });
+  document.querySelectorAll('.tv-all').forEach(all => {
+    all.onchange = () => {
+      document.querySelectorAll('.tv-sym[data-g="' + all.getAttribute('data-g') + '"]').forEach(c => { c.checked = all.checked; });
+    };
+  });
+  document.getElementById('tvImportBtn').onclick = tvDoImport;
+}
+async function tvDoImport() {
+  const groups = window.__tvImport || [];
+  let added = 0, skipped = 0, usedWatchlist = false, usedPriority = false;
+  groups.forEach((g, gi) => {
+    const sel = document.getElementById('tv-dest-' + gi);
+    if (!sel) return;
+    const dest = sel.value;
+    if (dest === 'skip') return;
+    const syms = [...document.querySelectorAll('.tv-sym[data-g="' + gi + '"]')].filter(c => c.checked).map(c => c.getAttribute('data-s'));
+    if (!syms.length) return;
+    if (dest === 'priority') {
+      usedPriority = true;
+      syms.forEach(sym => {
+        if (state.priority.find(p => p.symbol === sym)) { skipped++; return; }
+        state.priority.push({ id: generateId(), symbol: sym, category: 'stocks', setup: '', trigger: null, target: null, sl: null, notes: 'Imported from TradingView', chart: '', createdAt: new Date().toISOString() });
+        added++;
+      });
+    } else {
+      usedWatchlist = true;
+      let wl;
+      if (dest === 'new') { wl = { id: generateId(), name: g.section, symbols: [] }; state.watchlists.push(wl); }
+      else { wl = state.watchlists.find(w => w.id === dest.slice(3)); }
+      if (!wl) return;
+      syms.forEach(sym => {
+        if (wl.symbols.find(s => s.symbol === sym)) { skipped++; return; }
+        wl.symbols.push({ symbol: sym, notes: '', gtt: null, addedAt: new Date().toISOString() });
+        added++;
+      });
+    }
+  });
+  await saveState();
+  closeModal();
+  showToast(`Imported ${added} symbol${added === 1 ? '' : 's'}${skipped ? ` · ${skipped} already there` : ''}`, added ? 'success' : 'info');
+  if (usedWatchlist) switchTab('watchlist');
+  else if (usedPriority) switchTab('priority');
+  else renderActivePanel();
 }
 
 function renameWatchlistPrompt(wlId) {
