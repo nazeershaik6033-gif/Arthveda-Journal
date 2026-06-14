@@ -35,7 +35,7 @@ const fontCss=id=>{const f=FONTS.find(f=>f.id===id);return(f?f.css:FONTS[0].css)
 const WORDMARK="'Playfair Display','Lora',Georgia,serif";
 const UIF="-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif";
 
-const DEFAULT_SETTINGS={theme:'light',font:'Lora',fontSize:19,lineHeight:1.62,sort:'newest',filter:'all',ttsRate:1,ttsVoice:'',wpm:380,justify:false,aiKey:'',aiModel:'deepseek/deepseek-r1-0528:free',aiLang:'English',aiProvider:'openrouter',geminiKey:'',geminiModel:'gemini-2.5-flash'};
+const DEFAULT_SETTINGS={theme:'light',font:'Lora',fontSize:19,lineHeight:1.62,sort:'newest',filter:'all',hideRead:false,ttsRate:1,ttsVoice:'',wpm:380,justify:false,aiKey:'',aiModel:'deepseek/deepseek-r1-0528:free',aiLang:'English',aiProvider:'openrouter',geminiKey:'',geminiModel:'gemini-2.5-flash'};
 
 /* models OpenRouter has retired — saved settings get migrated to the new default */
 const DEAD_MODELS=['deepseek/deepseek-chat-v3-0324:free','deepseek/deepseek-r1:free'];
@@ -2292,9 +2292,11 @@ function App(){
       else if(f==='articles')arr=arr.filter(a=>!a.isVideo);
       else if(f==='videos')arr=arr.filter(a=>a.isVideo);
       else if(f==='completed')arr=arr.filter(a=>(a.progress||0)>=0.97);
+      // Quick "Hide read" toggle — drops finished items everywhere except Archive.
+      if(S.hideRead&&scope.type!=='archive')arr=arr.filter(a=>(a.progress||0)<0.97);
     }
     return sortArticles(arr,S.sort);
-  },[data,scope,q,S.sort,S.filter]);
+  },[data,scope,q,S.sort,S.filter,S.hideRead]);
   const snippetFor=a=>{
     if(!q||!a.text)return null;
     const i=a.text.toLowerCase().indexOf(q);
@@ -2371,7 +2373,11 @@ function App(){
           h('span',{style:{color:T.sub,display:'flex'}},Icons.search(17)),
           h('input',{value:query,onChange:e=>setQuery(e.target.value),placeholder:'Search',
             style:{flex:1,border:'none',background:'transparent',color:T.fg,fontSize:15.5,minWidth:0}}),
-          query?h('button',{onClick:()=>setQuery(''),className:'act90',style:{color:T.sub,display:'flex',padding:2}},Icons.x(16)):null)):null,
+          query?h('button',{onClick:()=>setQuery(''),className:'act90',style:{color:T.sub,display:'flex',padding:2}},Icons.x(16)):null),
+        (!q&&scope.type!=='archive')?h('div',{style:{display:'flex',justifyContent:'flex-end',marginTop:8}},
+          h('button',{onClick:()=>update(d=>({...d,settings:{...d.settings,hideRead:!d.settings.hideRead}})),className:'act90',
+            style:{display:'flex',alignItems:'center',gap:5,fontSize:12.5,fontWeight:600,color:S.hideRead?T.accent:T.sub,background:S.hideRead?T.card:'transparent',border:'1px solid '+(S.hideRead?T.accent:T.hair),borderRadius:999,padding:'5px 12px'}},
+            (S.hideRead?'✓ ':'')+'Hide read')):null):null,
       h('div',{ref:listScrollRef,className:'sy',style:{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:ttsUI?100:16}},body),
       selecting?h('div',{style:{flexShrink:0,borderTop:'1px solid '+T.hair,background:T.bg,paddingBottom:SAFE_B}},
         selecting.mode==='playlist'
