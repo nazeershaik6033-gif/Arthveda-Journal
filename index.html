@@ -777,6 +777,20 @@ body.reader-active #panel-reader .reader-frame {
   transition: border-color 0.15s ease;
 }
 .trade-card:hover { border-color: var(--border); }
+/* Watchlist pin / star / drag-reorder */
+.trade-card.wl-starred { border-color: var(--warning, #e0a500); box-shadow: inset 3px 0 0 var(--warning, #e0a500); }
+.trade-card.wl-dragging { opacity: 0.92; border-color: var(--accent, #2584ff); box-shadow: 0 8px 26px rgba(0,0,0,0.35); position: relative; z-index: 5; }
+.wl-card-tools { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.wl-tool {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+  color: var(--text-subtle); background: transparent; border: none; cursor: pointer;
+}
+.wl-tool:hover { background: var(--surface-3); color: var(--text); }
+.wl-tool.on { color: var(--warning, #e0a500); }
+.wl-tool.pin.on { color: var(--accent, #2584ff); }
+.wl-drag-handle { touch-action: none; cursor: grab; }
+.wl-drag-handle:active { cursor: grabbing; }
 .trade-header {
   display: flex;
   align-items: flex-start;
@@ -4187,14 +4201,18 @@ function renderWatchlist() {
       <button class="btn btn-ghost btn-sm" onclick="renameWatchlistPrompt('${active.id}')">Rename</button>
       ${state.watchlists.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteWatchlistPrompt('${active.id}')">Delete List</button>` : ''}
     </div>
-    ${active.symbols.length ? active.symbols.map(s => {
+    ${active.symbols.length ? `<div id="wlCards">${wlOrderedSymbols(active.symbols).map(s => {
       const live = window.livePrices[s.symbol];
+      const sym = escapeHtml(s.symbol);
       return `
-        <div class="trade-card">
+        <div class="trade-card${s.starred ? ' wl-starred' : ''}" data-symbol="${sym}">
           <div class="trade-header">
-            <div>
-              <div class="trade-symbol-row"><div class="trade-symbol">${escapeHtml(s.symbol)}</div>${tvBtn(s.symbol)}</div>
-              ${s.notes ? `<div class="trade-name">${escapeHtml(s.notes)}</div>` : ''}
+            <div style="display:flex;align-items:flex-start;gap:8px;min-width:0;">
+              <button class="wl-tool wl-drag-handle" title="Drag to reorder" aria-label="Reorder">${WL_ICON.grip}</button>
+              <div style="min-width:0;">
+                <div class="trade-symbol-row"><div class="trade-symbol">${sym}</div>${tvBtn(s.symbol)}</div>
+                ${s.notes ? `<div class="trade-name">${escapeHtml(s.notes)}</div>` : ''}
+              </div>
             </div>
             <div class="trade-badges">
               ${live ? `<span class="badge ${live.change >= 0 ? 'success' : 'error'}">${formatINR(live.price)} (${live.changePct >= 0 ? '+' : ''}${(live.changePct || 0).toFixed(2)}%)</span>` : '<span class="badge">No price</span>'}
@@ -4202,12 +4220,16 @@ function renderWatchlist() {
             </div>
           </div>
           <div class="trade-actions">
-            <button class="btn btn-ghost btn-sm" onclick="openGttModal('${active.id}','${escapeHtml(s.symbol)}')">${s.gtt && s.gtt.enabled ? 'Edit GTT' : 'Set GTT'}</button>
-            <button class="btn btn-danger btn-sm" onclick="removeWatchlistSymbol('${active.id}','${escapeHtml(s.symbol)}')">Remove</button>
+            <div class="wl-card-tools">
+              <button class="wl-tool pin${s.pinned ? ' on' : ''}" title="${s.pinned ? 'Unpin' : 'Pin to top'}" onclick="toggleWatchlistPin('${active.id}','${sym}')">${s.pinned ? WL_ICON.pinOn : WL_ICON.pin}</button>
+              <button class="wl-tool${s.starred ? ' on' : ''}" title="${s.starred ? 'Remove star' : 'Mark important'}" onclick="toggleWatchlistStar('${active.id}','${sym}')">${s.starred ? WL_ICON.starOn : WL_ICON.star}</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="openGttModal('${active.id}','${sym}')">${s.gtt && s.gtt.enabled ? 'Edit GTT' : 'Set GTT'}</button>
+            <button class="btn btn-danger btn-sm" onclick="removeWatchlistSymbol('${active.id}','${sym}')">Remove</button>
           </div>
         </div>
       `;
-    }).join('') : `
+    }).join('')}</div>` : `
       <div class="empty-state">
         <div class="empty-state-icon">👁</div>
         <div class="empty-state-title">No symbols in this list</div>
@@ -4215,6 +4237,81 @@ function renderWatchlist() {
         <button class="btn" onclick="addWatchlistSymbolPrompt()">+ Add Symbol</button>
       </div>`}
   `;
+  initWatchlistDrag();
+}
+
+/* Pinned symbols float to the top; manual drag order is preserved within each
+   group (Array.prototype.sort is stable). Star is a highlight only — it does
+   not change position. */
+function wlOrderedSymbols(symbols) {
+  return symbols.map((s, i) => ({ s, i }))
+    .sort((a, b) => (b.s.pinned ? 1 : 0) - (a.s.pinned ? 1 : 0) || a.i - b.i)
+    .map(o => o.s);
+}
+const WL_ICON = {
+  grip: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>',
+  pin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M9 3.5h6l-.8 5 2.8 3.2H7l2.8-3.2-.8-5Z"/><path d="M12 11.7V20" stroke-linecap="round"/></svg>',
+  pinOn: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M9 3.5h6l-.8 5 2.8 3.2H7l2.8-3.2-.8-5Z"/><path d="M12 11.7V20" stroke-linecap="round"/></svg>',
+  star: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 4l2.3 4.7 5.2.8-3.8 3.7.9 5.2L12 16.9 7.2 18.4l.9-5.2L4.3 9.5l5.2-.8L12 4Z"/></svg>',
+  starOn: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 4l2.3 4.7 5.2.8-3.8 3.7.9 5.2L12 16.9 7.2 18.4l.9-5.2L4.3 9.5l5.2-.8L12 4Z"/></svg>'
+};
+async function toggleWatchlistPin(wlId, symbol) {
+  const wl = state.watchlists.find(w => w.id === wlId); if (!wl) return;
+  const s = wl.symbols.find(x => x.symbol === symbol); if (!s) return;
+  s.pinned = !s.pinned;
+  await saveState();
+  renderActivePanel();
+}
+async function toggleWatchlistStar(wlId, symbol) {
+  const wl = state.watchlists.find(w => w.id === wlId); if (!wl) return;
+  const s = wl.symbols.find(x => x.symbol === symbol); if (!s) return;
+  s.starred = !s.starred;
+  await saveState();
+  renderActivePanel();
+}
+/* Pointer-based drag reorder (works on touch + mouse). The dragged card is
+   reordered live in the DOM as the pointer moves; the new order is committed
+   to state on release. */
+function initWatchlistDrag() {
+  const container = document.getElementById('wlCards');
+  if (!container) return;
+  container.querySelectorAll('.wl-drag-handle').forEach(handle => {
+    handle.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      const dragEl = handle.closest('.trade-card');
+      if (!dragEl) return;
+      dragEl.classList.add('wl-dragging');
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+      const onMove = ev => {
+        const cards = [...container.querySelectorAll('.trade-card:not(.wl-dragging)')];
+        let placed = false;
+        for (const c of cards) {
+          const r = c.getBoundingClientRect();
+          if (ev.clientY < r.top + r.height / 2) { container.insertBefore(dragEl, c); placed = true; break; }
+        }
+        if (!placed) container.appendChild(dragEl);
+      };
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onUp);
+        dragEl.classList.remove('wl-dragging');
+        commitWatchlistOrder();
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
+    });
+  });
+}
+async function commitWatchlistOrder() {
+  const container = document.getElementById('wlCards');
+  const active = state.watchlists.find(w => w.id === activeSubTab.wl);
+  if (!container || !active) return;
+  const order = [...container.querySelectorAll('.trade-card')].map(c => c.dataset.symbol);
+  active.symbols.sort((a, b) => order.indexOf(a.symbol) - order.indexOf(b.symbol));
+  await saveState();
+  renderActivePanel();
 }
 
 function newWatchlistPrompt() {
