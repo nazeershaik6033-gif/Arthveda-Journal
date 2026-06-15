@@ -1427,6 +1427,17 @@ html.light .dock-btn.active .dock-icon {
   cursor: zoom-out;
 }
 .lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+.lb-img { touch-action: none; will-change: transform; user-select: none; -webkit-user-drag: none; transition: transform 0.15s ease; }
+.lb-ctrls {
+  position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 12px;
+  display: flex; gap: 8px; z-index: 2;
+}
+.lb-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(0,0,0,0.55); color: #fff; border: 1px solid rgba(255,255,255,0.25);
+  font-size: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.lb-btn:disabled { opacity: 0.35; }
 
 /* Search modal results */
 .search-result {
@@ -3545,10 +3556,7 @@ function deleteCoreClosed(id) {
 function openCoreLightbox(id) {
   const item = (state.coreClosed || []).find(x => x.id === id);
   if (!item || !item.exitChart) return;
-  showModal({
-    title: `${item.symbol} — Exit Chart`,
-    body: `<img src="${item.exitChart}" style="width:100%; border-radius: 8px; max-height: 70vh; object-fit: contain;">`
-  });
+  openZoomImage(item.exitChart);
 }
 
 /* ========================================================================
@@ -4080,21 +4088,58 @@ function openLightbox(tradeId, which) {
   const t = state.trades.find(x => x.id === tradeId);
   if (!t) return;
   const src = which === 'entry' ? t.entryChart : t.exitChart;
-  if (!src) return;
-  const lb = document.createElement('div');
-  lb.className = 'lightbox';
-  lb.innerHTML = `<img src="${src}" alt="Chart">`;
-  lb.onclick = () => lb.remove();
-  document.body.appendChild(lb);
+  openZoomImage(src);
 }
 
-function openImageLightbox(src) {
+function openImageLightbox(src) { openZoomImage(src); }
+
+/* Zoomable image viewer — pinch, double-tap, drag-to-pan, and −/+ buttons.
+   Used for chart/photo thumbnails across Priority Setups, Trades and Core. */
+function openZoomImage(src) {
   if (!src) return;
   const lb = document.createElement('div');
   lb.className = 'lightbox';
-  lb.innerHTML = `<img src="${src}" alt="Image">`;
-  lb.onclick = () => lb.remove();
+  lb.innerHTML =
+    '<div class="lb-ctrls">' +
+      '<button class="lb-btn" data-z="out" aria-label="Zoom out">−</button>' +
+      '<button class="lb-btn" data-z="in" aria-label="Zoom in">+</button>' +
+      '<button class="lb-btn" data-z="close" aria-label="Close">✕</button>' +
+    '</div>' +
+    '<img class="lb-img" src="' + src + '" alt="Image" draggable="false">';
   document.body.appendChild(lb);
+  const img = lb.querySelector('.lb-img');
+  const btnOut = lb.querySelector('[data-z="out"]');
+  let s = 1, x = 0, y = 0, g = null, lastTap = 0;
+  const apply = () => { img.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')'; btnOut.disabled = s <= 1.01; };
+  const setScale = ns => { s = Math.max(1, Math.min(5, ns)); if (s <= 1.01) { s = 1; x = 0; y = 0; } apply(); };
+  const close = () => lb.remove();
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  btnOut.onclick = e => { e.stopPropagation(); setScale(s - 0.5); };
+  lb.querySelector('[data-z="in"]').onclick = e => { e.stopPropagation(); setScale(s + 0.5); };
+  lb.querySelector('[data-z="close"]').onclick = e => { e.stopPropagation(); close(); };
+  lb.onclick = () => { if (s <= 1.01) close(); };           // tap backdrop closes only when not zoomed
+  img.onclick = e => e.stopPropagation();
+  img.addEventListener('touchstart', e => {
+    img.style.transition = 'none';
+    if (e.touches.length === 2) g = { mode: 'pinch', d0: dist(e.touches) || 1, s0: s };
+    else if (e.touches.length === 1) g = { mode: 'pan', x0: e.touches[0].clientX, y0: e.touches[0].clientY, ox: x, oy: y, moved: false };
+  }, { passive: false });
+  img.addEventListener('touchmove', e => {
+    if (!g) return;
+    if (g.mode === 'pinch' && e.touches.length === 2) { e.preventDefault(); setScale(g.s0 * dist(e.touches) / g.d0); }
+    else if (g.mode === 'pan' && e.touches.length === 1 && s > 1) { e.preventDefault(); const dx = e.touches[0].clientX - g.x0, dy = e.touches[0].clientY - g.y0; if (Math.abs(dx) + Math.abs(dy) > 4) g.moved = true; x = g.ox + dx; y = g.oy + dy; apply(); }
+  }, { passive: false });
+  img.addEventListener('touchend', e => {
+    img.style.transition = '';
+    if (g && g.mode === 'pan' && !g.moved) {
+      const now = Date.now();
+      if (now - lastTap < 300) { lastTap = 0; setScale(s > 1 ? 1 : 2.5); }
+      else lastTap = now;
+    }
+    g = null;
+  });
+  lb.addEventListener('wheel', e => { e.preventDefault(); setScale(s + (e.deltaY < 0 ? 0.25 : -0.25)); }, { passive: false });
+  apply();
 }
 
 /* ========================================================================
