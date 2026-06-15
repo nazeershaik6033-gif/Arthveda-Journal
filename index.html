@@ -481,7 +481,7 @@ html.light .brand-logo {
   display: block;
   width: 100%;
   border: 0;
-  background: #fff;
+  background: var(--bg);
 }
 /* While the Reader is open, Instapaper takes over the whole viewport: the
    journal's header, market banner, bottom dock and FAB are hidden, and the
@@ -498,7 +498,7 @@ body.reader-active #panel-reader {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: #fff;
+  background: var(--bg);
 }
 body.reader-active #panel-reader .reader-embed {
   position: absolute;
@@ -2426,7 +2426,18 @@ function renderReader() {
       '</div>';
     panel.dataset.loaded = '1';
   }
+  // Paint the iframe + panel with the reader's last known theme colour so the
+  // safe-area strip behind it matches (no white flash before the reader reports).
+  let c = window.__readerThemeColor;
+  if (!c) { try { c = localStorage.getItem('reader_theme_color'); } catch (e) {} }
+  if (c) applyReaderThemeColor(c);
   // Full-screen sizing is handled entirely in CSS (#panel-reader inset:0).
+}
+function applyReaderThemeColor(color) {
+  const panel = document.getElementById('panel-reader');
+  if (panel) panel.style.background = color;
+  const frame = document.getElementById('readerFrame');
+  if (frame) frame.style.background = color;
 }
 
 /* Reader header icon → quick menu (Home / Browser / Photos). Each option opens
@@ -2481,9 +2492,13 @@ window.addEventListener('message', (e) => {
   const d = e.data;
   if (!d) return;
   if (d.type === 'arthveda-reader-back') switchTab('dashboard');
-  // Instapaper reports its theme colour so the status bar can match it.
+  // Instapaper reports its theme colour so the status bar — and the safe-area
+  // strip behind the iframe — match it (the iframe drops viewport-fit=cover when
+  // embedded, so its own element background shows under the status bar).
   else if (d.type === 'instapaper-theme' && typeof d.color === 'string') {
     window.__readerThemeColor = d.color;
+    try { localStorage.setItem('reader_theme_color', d.color); } catch (e) {}
+    applyReaderThemeColor(d.color);
     if (activeTab === 'reader') {
       const m = document.querySelector('meta[name="theme-color"]');
       if (m) m.setAttribute('content', d.color);
