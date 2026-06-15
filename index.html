@@ -2429,6 +2429,52 @@ function renderReader() {
   // Full-screen sizing is handled entirely in CSS (#panel-reader inset:0).
 }
 
+/* Reader header icon → quick menu (Home / Browser / Photos). Each option opens
+   the reader tab and tells the embedded app which section to show via postMessage. */
+function openReaderAt(scope) {
+  const existed = !!document.getElementById('readerFrame');
+  switchTab('reader');
+  const f = document.getElementById('readerFrame');
+  if (!f) return;
+  const post = () => { try { f.contentWindow && f.contentWindow.postMessage({ type: 'reader-nav', scope: scope }, '*'); } catch (e) {} };
+  if (existed) { post(); }
+  else { f.addEventListener('load', () => { post(); setTimeout(post, 250); }, { once: true }); setTimeout(post, 900); }
+}
+function closeReaderMenu() {
+  const m = document.getElementById('readerMenu'); if (m) m.remove();
+  document.removeEventListener('click', closeReaderMenu);
+}
+function openReaderMenu(e) {
+  if (e) e.stopPropagation();
+  if (document.getElementById('readerMenu')) { closeReaderMenu(); return; }
+  const btn = document.getElementById('readerBtn');
+  const r = btn.getBoundingClientRect();
+  const ic = {
+    home: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>',
+    browse: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.3 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.3-3.6-8.5S9.6 5.8 12 3.5Z"/></svg>',
+    photos: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/><circle cx="8.5" cy="9.5" r="1.4"/><path d="M4 16.5 9 12l3.5 3 3-2.5 4.5 4"/></svg>'
+  };
+  const menu = document.createElement('div');
+  menu.id = 'readerMenu';
+  menu.className = 'header-menu open';
+  menu.style.position = 'fixed';
+  menu.style.top = (r.bottom + 6) + 'px';
+  menu.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+  menu.style.left = 'auto';
+  menu.style.width = '210px';
+  menu.style.zIndex = '200';
+  menu.innerHTML =
+    '<div class="header-menu-label">Reader</div>' +
+    '<button class="header-menu-row" data-scope="home"><span class="hm-left">' + ic.home + '<span class="hm-name">Home</span></span></button>' +
+    '<button class="header-menu-row" data-scope="browse"><span class="hm-left">' + ic.browse + '<span class="hm-name">Browser</span></span></button>' +
+    '<button class="header-menu-row" data-scope="photos"><span class="hm-left">' + ic.photos + '<span class="hm-name">Photos</span></span></button>';
+  document.body.appendChild(menu);
+  menu.querySelectorAll('[data-scope]').forEach(b => {
+    b.onclick = (ev) => { ev.stopPropagation(); const s = b.getAttribute('data-scope'); closeReaderMenu(); openReaderAt(s); };
+  });
+  setTimeout(() => document.addEventListener('click', closeReaderMenu), 0);
+}
+
 // The embedded Instapaper posts this when its in-app Back arrow is tapped —
 // return to the journal's home and restore the normal chrome.
 window.addEventListener('message', (e) => {
@@ -6590,7 +6636,7 @@ async function init() {
   setInterval(updateMarketStatus, 1000);
   setupAutoRefresh();
   document.getElementById('searchBtn').onclick = openSearchModal;
-  document.getElementById('readerBtn').onclick = () => switchTab('reader');
+  document.getElementById('readerBtn').onclick = openReaderMenu;
   document.getElementById('themeToggleBtn').onclick = toggleTheme;
   document.getElementById('menuBtn').onclick = openDrawer;
   document.getElementById('drawerCloseBtn').onclick = closeDrawer;
