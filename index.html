@@ -1866,7 +1866,7 @@ const DEFAULT_STATE = {
     theme: 'dark',
     textFont: 'Inter',
     textSize: 14,
-    numFont: 'JetBrains Mono',
+    numFont: 'Inter',
     numSize: 13,
     trackCommission: true,
     commissionRate: 0.0005,
@@ -2048,6 +2048,12 @@ function normalizeState(s) {
   if (s.journalNotes && typeof s.journalNotes === 'object') merged.journalNotes = s.journalNotes;
   if (Array.isArray(s.rules)) merged.rules = s.rules;
   if (s.settings && typeof s.settings === 'object') merged.settings = { ...merged.settings, ...s.settings };
+  // One-time: unify the number font with the text (sans) font so numbers across
+  // every page match the journal day card's clean look instead of monospace.
+  if (!merged.settings.numFontUnified) {
+    merged.settings.numFont = merged.settings.textFont || 'Inter';
+    merged.settings.numFontUnified = true;
+  }
   // Deep-merge the AI config so older/partial saves keep all sub-fields
   const savedAi = (s.settings && s.settings.ai) || {};
   merged.settings.ai = {
@@ -5821,11 +5827,11 @@ function renderSettings() {
 
       <!-- Number Font -->
       <div class="form-group">
-        <label class="form-label">Number / Mono Font</label>
+        <label class="form-label">Number Font</label>
         <select class="form-input" id="numFontSel" onchange="setNumFont(this.value)">
-          ${['JetBrains Mono','Space Mono','IBM Plex Mono','Fira Code','Courier New'].map(f => `<option value="${f}" ${(state.settings.numFont||'JetBrains Mono')===f?'selected':''}>${f}</option>`).join('')}
+          ${['Inter','Roboto','Poppins','Lato','Open Sans','Nunito','JetBrains Mono','Space Mono','IBM Plex Mono','Fira Code','Courier New'].map(f => `<option value="${f}" ${(state.settings.numFont||'Inter')===f?'selected':''}>${f}</option>`).join('')}
         </select>
-        <div class="font-preview-num" id="numFontPreview" style="font-family:'${state.settings.numFont||'JetBrains Mono'}',monospace; font-size:${state.settings.numSize||13}px;">
+        <div class="font-preview-num" id="numFontPreview" style="font-family:'${state.settings.numFont||'Inter'}',ui-sans-serif,system-ui,sans-serif; font-size:${state.settings.numSize||13}px;">
           ₹1,23,456.78 · +₹4,567 · -₹890.50 · 12:01:32 IST
         </div>
       </div>
