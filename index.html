@@ -4251,27 +4251,37 @@ function tvSym(tok) {
 }
 function tvParse(text) {
   if (!text) return [];
+  // Whatever the source — an exported .txt (###Section,EXCHANGE:SYMBOL,…), a
+  // proxied JSON payload ("###Section","EXCHANGE:SYMBOL",…) or rendered link
+  // text — TradingView writes each category as a "###Name" row ahead of its
+  // symbols. Decode the usual JSON escapes, then scan IN ORDER for either a
+  // section header or an EXCHANGE:SYMBOL token, so the category labels survive
+  // (the old link path discarded them and dumped everything into one group).
+  const s = String(text).replace(/\\u0023/gi, '#').replace(/\\u003a/gi, ':');
   const groups = [];
   let cur = null;
-  const ensure = (name) => { cur = { section: (name || 'Imported').slice(0, 40), symbols: [] }; groups.push(cur); };
-  if (text.includes('###')) {
-    // TradingView export format: ###Section,EXCHANGE:SYMBOL,...
-    text.split(/[,\n\r]+/).map(t => t.trim()).filter(Boolean).forEach(tok => {
-      if (tok.startsWith('###')) ensure(tok.replace(/^#+/, '').trim());
-      else { const s = tvSym(tok); if (s) { if (!cur) ensure('Imported'); if (!cur.symbols.includes(s)) cur.symbols.push(s); } }
-    });
-  } else if (/[<{]/.test(text) && text.length > 400) {
-    // Fetched HTML/JSON from a link — extract EXCHANGE:SYMBOL tokens
-    const set = new Set();
-    const re = /\b([A-Z]{2,6}):([A-Z0-9][A-Z0-9&._-]{0,19})\b/g;
-    let m;
-    while ((m = re.exec(text)) && set.size < 800) { const s = tvSym(m[0]); if (s) set.add(s); }
-    if (set.size) { ensure('Imported from link'); cur.symbols = [...set]; }
-  } else {
+  const ensure = (name) => {
+    const nm = (name || 'Imported').trim().slice(0, 40) || 'Imported';
+    cur = { section: nm, symbols: [] };
+    groups.push(cur);
+  };
+  const add = (raw) => {
+    const sym = tvSym(raw);
+    if (!sym) return;
+    if (!cur) ensure('Imported');
+    if (!cur.symbols.includes(sym)) cur.symbols.push(sym);
+  };
+  const re = /###\s*([^,"'\n\r\[\]{}]+)|\b([A-Z]{2,12}):([A-Z0-9][A-Z0-9&._!-]{0,19})/g;
+  let m, guard = 0;
+  while ((m = re.exec(s)) && guard++ < 5000) {
+    if (m[1] != null) ensure(m[1]);          // category header → start a new group
+    else add(m[2] + ':' + m[3]);             // EXCHANGE:SYMBOL → into current group
+  }
+  // Fallback: a bare list with no exchange prefixes and no section headers.
+  if (!groups.some(g => g.symbols.length)) {
+    groups.length = 0; cur = null;
     ensure('Imported');
-    text.split(/[\s,]+/).map(t => t.trim()).filter(Boolean).forEach(tok => {
-      const s = tvSym(tok); if (s && !cur.symbols.includes(s)) cur.symbols.push(s);
-    });
+    s.split(/[\s,]+/).map(t => t.trim()).filter(Boolean).forEach(add);
   }
   return groups.filter(g => g.symbols.length);
 }
