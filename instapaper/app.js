@@ -385,7 +385,7 @@ async function resolveYtChannelId(url){
   return'';
 }
 async function fetchYtVideos(channelId){
-  const raw=await fetchRawHtml('https://www.youtube.com/feeds/videos.xml?channel_id='+channelId);
+  const raw=await fetchRawAcross('https://www.youtube.com/feeds/videos.xml?channel_id='+channelId,t=>/<entry[\s>]/i.test(t));
   const doc=new DOMParser().parseFromString(raw,'text/xml');
   const entries=[].slice.call(doc.getElementsByTagName('entry'),0,20);
   return entries.map(entry=>{
@@ -427,7 +427,7 @@ function tgHandle(url){
   return'';
 }
 async function fetchTelegram(handle){ // public channel preview at t.me/s/<handle>
-  const raw=await fetchRawHtml('https://t.me/s/'+encodeURIComponent(handle));
+  const raw=await fetchRawAcross('https://t.me/s/'+encodeURIComponent(handle),t=>/tgme_widget_message/.test(t));
   const doc=new DOMParser().parseFromString(raw,'text/html');
   const msgs=[].slice.call(doc.querySelectorAll('.tgme_widget_message'));
   return msgs.map(m=>{
@@ -443,7 +443,7 @@ async function fetchTelegram(handle){ // public channel preview at t.me/s/<handl
   }).filter(e=>e.publishedMs).sort((a,b)=>b.publishedMs-a.publishedMs).slice(0,25);
 }
 async function fetchRss(url){ // RSS or Atom — news, blogs, Reddit, bridges
-  const raw=await fetchRawHtml(url);
+  const raw=await fetchRawAcross(url,t=>/<(?:item|entry)[\s>]/i.test(t));
   const doc=new DOMParser().parseFromString(raw,'text/xml');
   let nodes=[].slice.call(doc.getElementsByTagName('item')),atom=false;
   if(!nodes.length){nodes=[].slice.call(doc.getElementsByTagName('entry'));atom=true}
@@ -638,19 +638,26 @@ async function fetchViaJina(url){
 }
 
 const PROXIES=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(u),u=>'https://corsproxy.io/?url='+encodeURIComponent(u)];
-async function fetchRawHtml(url){
-  let lastErr=null;
+/* Fetch a URL through the proxy pool, trying each in turn. A proxy can return
+   a usable body, an error/consent page, or nothing — so when an `ok` validator
+   is given we keep going until one response actually passes it, remembering the
+   longest body as a last-resort fallback. */
+async function fetchRawAcross(url,ok){
+  let best='',lastErr=null;
   for(const p of PROXIES){
     try{
       const res=await fetchWithTimeout(p(url),{},25000);
-      if(!res.ok)throw new Error('proxy '+res.status);
+      if(!res.ok){lastErr=new Error('proxy '+res.status);continue}
       const text=await res.text();
-      if(text&&text.length>200)return text;
-      throw new Error('empty proxy response');
+      if(!text){lastErr=new Error('empty proxy response');continue}
+      if(!ok||ok(text))return text;
+      if(text.length>best.length)best=text;
     }catch(e){lastErr=e}
   }
+  if(best)return best;
   throw lastErr||new Error('all proxies failed');
 }
+function fetchRawHtml(url){return fetchRawAcross(url,t=>t.length>200)}
 
 const SAN_ALLOW={P:'p',H1:'h2',H2:'h2',H3:'h3',H4:'h4',H5:'h5',H6:'h6',BLOCKQUOTE:'blockquote',UL:'ul',OL:'ol',LI:'li',PRE:'pre',CODE:'code',EM:'em',I:'em',STRONG:'strong',B:'strong',A:'a',IMG:'img',FIGURE:'figure',FIGCAPTION:'figcaption',BR:'br',HR:'hr',MARK:'em',CITE:'cite',SUP:'sup',SUB:'sub'};
 function absUrl(u,base){try{return new URL(u,base).href}catch(e){return''}}
