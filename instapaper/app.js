@@ -312,12 +312,34 @@ function normalizeUrl(u){u=String(u||'').trim();if(!u)return'';if(!/^https?:\/\/
 /* ---------- daily brief: youtube channel resolution + latest video (RSS) ---------- */
 function ymd(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())}
 function parseYtChannelId(url){const m=String(url||'').match(/channel\/(UC[\w-]{20,})/);return m?m[1]:''}
+/* Turn anything a user might paste into a real YouTube page URL we can scrape:
+   a full link, youtube.com/@handle, @handle, /c/Name, /user/Name, or a bare name. */
+function ytTargetUrl(input){
+  let s=String(input||'').trim();
+  if(!s)return'';
+  // explicit @handle with no domain  →  /@handle
+  if(/^@[\w.\-]+$/.test(s))return'https://www.youtube.com/'+s;
+  // contains a youtube domain already → just ensure a protocol
+  if(/(?:^|\.)(?:youtube\.com|youtu\.be)\//i.test(s)||/youtube\.com|youtu\.be/i.test(s)){
+    if(!/^https?:\/\//i.test(s))s='https://'+s.replace(/^\/+/,'');
+    return s;
+  }
+  // bare token (no slash / space) → treat as a channel handle
+  if(/^[\w.\-]+$/.test(s))return'https://www.youtube.com/@'+s.replace(/^@/,'');
+  // some other URL
+  if(!/^https?:\/\//i.test(s))s='https://'+s.replace(/^\/+/,'');
+  return s;
+}
 async function resolveYtChannelId(url){
   const direct=parseYtChannelId(url);if(direct)return direct;
-  const u=/^https?:\/\//i.test(url)?url:'https://'+String(url||'').replace(/^\/+/,'');
+  const u=ytTargetUrl(url);if(!u)return'';
   try{
     const raw=await fetchRawHtml(u);
-    const m=raw.match(/"(?:channelId|externalId)":"(UC[\w-]{20,})"/)||raw.match(/itemprop="channelId"\s+content="(UC[\w-]{20,})"/)||raw.match(/channel\/(UC[\w-]{20,})/);
+    const m=raw.match(/"(?:channelId|externalId|browseId)":"(UC[\w-]{20,})"/)
+      ||raw.match(/itemprop="(?:channelId|identifier)"\s+content="(UC[\w-]{20,})"/)
+      ||raw.match(/rel="canonical"[^>]*href="[^"]*channel\/(UC[\w-]{20,})/)
+      ||raw.match(/href="[^"]*channel\/(UC[\w-]{20,})"[^>]*rel="canonical"/)
+      ||raw.match(/channel\/(UC[\w-]{20,})/);
     return m?m[1]:'';
   }catch(e){return''}
 }
@@ -1783,12 +1805,13 @@ function BriefView({T,brief,onBrief,toastFn}){
     const raw=(f.url||'').trim();if(!raw){toastFn('Enter a link or handle');return}
     const patch={kind:f.kind,channelId:'',handle:'',feedUrl:'',url:''};
     setBusy(true);
-    if(f.kind==='youtube'){patch.channelId=f.channelId||await resolveYtChannelId(normalizeUrl(raw)||raw);patch.url=normalizeUrl(raw)||(patch.channelId?'https://www.youtube.com/channel/'+patch.channelId:raw)}
+    if(f.kind==='youtube'){patch.channelId=f.channelId||await resolveYtChannelId(raw);patch.url=patch.channelId?'https://www.youtube.com/channel/'+patch.channelId:(ytTargetUrl(raw)||raw)}
     else if(f.kind==='telegram'){patch.handle=tgHandle(raw);patch.url=patch.handle?'https://t.me/'+patch.handle:(normalizeUrl(raw)||raw)}
     else if(f.kind==='rss'){patch.feedUrl=normalizeUrl(raw)||raw;patch.url=patch.feedUrl}
     else{patch.url=normalizeUrl(raw)||raw}
     setBusy(false);
-    patch.name=(f.name||'').trim()||(patch.handle?'@'+patch.handle:domainOf(patch.url))||'Item';
+    let ytName='';if(f.kind==='youtube'){const hm=raw.match(/@([\w.\-]+)/)||(/^[\w.\-]+$/.test(raw)&&!/youtu/i.test(raw)?[null,raw]:null);if(hm)ytName='@'+hm[1]}
+    patch.name=(f.name||'').trim()||(patch.handle?'@'+patch.handle:'')||ytName||domainOf(patch.url)||'Item';
     if(f.kind==='youtube'&&!patch.channelId)toastFn('Couldn’t find that channel — it’ll still open as a link');
     if(f.kind==='telegram'&&!patch.handle)toastFn('Couldn’t read that Telegram handle');
     let itemId=f.id;
@@ -1869,10 +1892,10 @@ function BriefView({T,brief,onBrief,toastFn}){
           [['link','Site / app'],['youtube','YouTube'],['telegram','Telegram'],['rss','RSS / News']].map(([k,lbl])=>h('button',{key:k,onClick:()=>setEdit({...edit,kind:k}),className:'act95',style:{flex:'1 0 auto',padding:'9px 10px',borderRadius:10,fontSize:13,fontWeight:600,border:'1px solid '+(edit.kind===k?T.accent:T.hair),color:edit.kind===k?T.accent:T.sub,background:edit.kind===k?T.card:'transparent'}},lbl))),
         h('input',{value:edit.name,onChange:e=>setEdit({...edit,name:e.target.value}),placeholder:'Name (optional)',
           style:{width:'100%',border:'1px solid '+T.hair,background:T.card,color:T.fg,borderRadius:10,padding:'12px 13px',fontSize:15,marginBottom:10}}),
-        h('input',{value:edit.url,onChange:e=>setEdit({...edit,url:e.target.value,channelId:'',handle:'',feedUrl:''}),placeholder:edit.kind==='youtube'?'YouTube channel link':edit.kind==='telegram'?'t.me/durov or @durov':edit.kind==='rss'?'https://…/feed.xml':'https://…',inputMode:'url',autoCapitalize:'none',autoCorrect:'off',spellCheck:false,
+        h('input',{value:edit.url,onChange:e=>setEdit({...edit,url:e.target.value,channelId:'',handle:'',feedUrl:''}),placeholder:edit.kind==='youtube'?'@handle, channel link, or name':edit.kind==='telegram'?'t.me/durov or @durov':edit.kind==='rss'?'https://…/feed.xml':'https://…',inputMode:'url',autoCapitalize:'none',autoCorrect:'off',spellCheck:false,
           style:{width:'100%',border:'1px solid '+T.hair,background:T.card,color:T.fg,borderRadius:10,padding:'12px 13px',fontSize:15,marginBottom:6}}),
         h('div',{style:{fontSize:11.5,color:T.sub,marginBottom:12,lineHeight:1.45}},
-          edit.kind==='youtube'?'Paste the channel URL (youtube.com/@handle or /channel/…). The brief shows its new videos.'
+          edit.kind==='youtube'?'Paste a channel URL, an @handle, or just the handle name (youtube.com/@handle, @handle, or /channel/…). The brief shows its new videos.'
           :edit.kind==='telegram'?'Public channel only (t.me/<name> or @name). The brief shows its new posts.'
           :edit.kind==='rss'?'Any RSS/Atom feed — a news site, blog, Substack, subreddit (.../.rss), or an X/Instagram bridge URL.'
           :'A site or app shortcut — opens in your browser. Use this for accounts with no public feed (Instagram, X, WhatsApp).'),
