@@ -330,18 +330,30 @@ function ytTargetUrl(input){
   if(!/^https?:\/\//i.test(s))s='https://'+s.replace(/^\/+/,'');
   return s;
 }
+function scanYtChannelId(raw){
+  const m=String(raw||'').match(/"(?:channelId|externalId|browseId)":"(UC[\w-]{20,})"/)
+    ||raw.match(/itemprop="(?:channelId|identifier)"\s+content="(UC[\w-]{20,})"/)
+    ||raw.match(/rel="canonical"[^>]*href="[^"]*channel\/(UC[\w-]{20,})/)
+    ||raw.match(/href="[^"]*channel\/(UC[\w-]{20,})"[^>]*rel="canonical"/)
+    ||raw.match(/channel\/(UC[\w-]{20,})/);
+  return m?m[1]:'';
+}
+/* Resolve a handle/name page to its UC… channel id. A single proxy often
+   returns a consent wall or truncated body with no id, so try every proxy
+   and keep going until one actually yields a channel id. */
 async function resolveYtChannelId(url){
   const direct=parseYtChannelId(url);if(direct)return direct;
   const u=ytTargetUrl(url);if(!u)return'';
-  try{
-    const raw=await fetchRawHtml(u);
-    const m=raw.match(/"(?:channelId|externalId|browseId)":"(UC[\w-]{20,})"/)
-      ||raw.match(/itemprop="(?:channelId|identifier)"\s+content="(UC[\w-]{20,})"/)
-      ||raw.match(/rel="canonical"[^>]*href="[^"]*channel\/(UC[\w-]{20,})/)
-      ||raw.match(/href="[^"]*channel\/(UC[\w-]{20,})"[^>]*rel="canonical"/)
-      ||raw.match(/channel\/(UC[\w-]{20,})/);
-    return m?m[1]:'';
-  }catch(e){return''}
+  for(const p of PROXIES){
+    try{
+      const res=await fetchWithTimeout(p(u),{},25000);
+      if(!res.ok)continue;
+      const raw=await res.text();
+      const id=scanYtChannelId(raw);
+      if(id)return id;
+    }catch(e){}
+  }
+  return'';
 }
 async function fetchYtVideos(channelId){
   const raw=await fetchRawHtml('https://www.youtube.com/feeds/videos.xml?channel_id='+channelId);
@@ -596,7 +608,7 @@ async function fetchViaJina(url){
   return{title,html,text,image,publishedAt,author:''};
 }
 
-const PROXIES=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://corsproxy.io/?url='+encodeURIComponent(u)];
+const PROXIES=[u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(u),u=>'https://corsproxy.io/?url='+encodeURIComponent(u)];
 async function fetchRawHtml(url){
   let lastErr=null;
   for(const p of PROXIES){
