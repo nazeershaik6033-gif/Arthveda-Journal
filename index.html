@@ -10,6 +10,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f172a">
 <meta name="apple-mobile-web-app-title" content="Naz Trades">
+<script>
+/* paint the saved theme before first render to avoid a flash */
+try{
+  var _t=(JSON.parse(localStorage.getItem('naz_trades_state')||'{}').settings||{}).theme;
+  var _cls={light:'light',sepia:'sepia',black:'black'}[_t];
+  if(_cls)document.documentElement.classList.add(_cls);
+  var _m=document.querySelector('meta[name="theme-color"]');
+  if(_m)_m.setAttribute('content',{light:'#f1f5f9',sepia:'#f4ecd8',dark:'#0f172a',black:'#000000'}[_t]||'#0f172a');
+}catch(e){}
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230f172a'/><path d='M 20,45 L 20,20 L 44,45 L 44,20' stroke='%23e2e8f0' stroke-width='6.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/><line x1='19' y1='46' x2='43' y2='22' stroke='%2322c55e' stroke-width='4' stroke-linecap='round'/><path d='M 47,18 L 38,20 L 42,27 Z' fill='%2322c55e'/></svg>" type="image/svg+xml">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%230f172a'/><path d='M 60,135 L 60,60 L 132,135 L 132,60' stroke='%23e2e8f0' stroke-width='19' fill='none' stroke-linecap='round' stroke-linejoin='round'/><line x1='57' y1='138' x2='129' y2='66' stroke='%2322c55e' stroke-width='12' stroke-linecap='round'/><path d='M 141,54 L 114,60 L 126,81 Z' fill='%2322c55e'/></svg>" type="image/svg+xml">
 <meta name="description" content="Naz Trades — offline trading journal for Indian traders">
@@ -158,6 +168,70 @@ html.light .calendar-wrap,
 html.light .stat-card {
   box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
 }
+
+/* ========================================================================
+   SEPIA — warm paper theme
+   ======================================================================== */
+html.sepia {
+  --bg: #f4ecd8;
+  --surface-0: #ece2c9;
+  --surface-1: #f4ecd8;
+  --surface-2: #fbf6ea;
+  --surface-3: #efe6d0;
+  --surface-4: #e7dcc1;
+  --surface-5: #d8c9a8;
+  --border: #d8c9a8;
+  --border-subtle: #e7dcc1;
+  --border-soft: #e7dcc1;
+  --primary: #b07a32;
+  --primary-hover: #95662a;
+  --primary-muted: rgba(176, 122, 50, 0.14);
+  --text: #3b3225;
+  --text-muted: #6f6450;
+  --text-subtle: #9a8c70;
+  --success: #4f8a3d;
+  --success-bg: rgba(79, 138, 61, 0.12);
+  --success-border: rgba(79, 138, 61, 0.3);
+  --error: #c0432f;
+  --error-bg: rgba(192, 67, 47, 0.1);
+  --error-border: rgba(192, 67, 47, 0.28);
+  --warning: #b9760f;
+  --warning-bg: rgba(185, 118, 15, 0.12);
+  --warning-border: rgba(185, 118, 15, 0.3);
+  --info: #3f76c0;
+}
+html.sepia .header { background: rgba(244, 236, 216, 0.9); }
+html.sepia .modal, html.sepia .modal-header { background: #fbf6ea; }
+html.sepia .trade-card,
+html.sepia .card,
+html.sepia .section-panel,
+html.sepia .calendar-wrap,
+html.sepia .stat-card {
+  box-shadow: 0 1px 3px rgba(70,52,20,0.10), 0 1px 2px rgba(70,52,20,0.06);
+}
+/* ========================================================================
+   BLACK — OLED dark theme
+   ======================================================================== */
+html.black {
+  --bg: #000000;
+  --surface-0: #000000;
+  --surface-1: #08080a;
+  --surface-2: #121214;
+  --surface-3: #161619;
+  --surface-4: #1e1e22;
+  --surface-5: #28282e;
+  --border: #2a2a31;
+  --border-subtle: #18181c;
+  --border-soft: #202025;
+  --text: #e6e6ea;
+  --text-muted: #9a9aa4;
+  --text-subtle: #6a6a74;
+  --primary: #7c7ff5;
+  --primary-hover: #6366f1;
+  --primary-muted: rgba(124, 127, 245, 0.16);
+}
+html.black .header { background: rgba(0, 0, 0, 0.88); }
+html.black .modal, html.black .modal-header { background: #121214; }
 
 /* Smooth theme transitions */
 *, *::before, *::after {
@@ -1737,7 +1811,7 @@ table.data-table tr:last-child td { border-bottom: none; }
       <button class="icon-btn" id="searchBtn" title="Search" aria-label="Search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
       </button>
-      <button class="icon-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle theme">
+      <button class="icon-btn" id="themeToggleBtn" title="Change theme" aria-label="Change theme">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 3a9 9 0 0 0 0 18z"/></svg>
       </button>
       <button class="icon-btn" id="headerMenuBtn" title="Watchlists" aria-label="Watchlists menu">
@@ -2322,7 +2396,7 @@ function switchTab(tabId) {
   const tcMeta = document.querySelector('meta[name="theme-color"]');
   if (tcMeta) {
     if (tabId === 'reader' && window.__readerThemeColor) tcMeta.setAttribute('content', window.__readerThemeColor);
-    else if (tabId !== 'reader') tcMeta.setAttribute('content', (state.settings.theme || 'dark') === 'light' ? '#f1f5f9' : '#0f172a');
+    else if (tabId !== 'reader') tcMeta.setAttribute('content', (NT_THEMES[state.settings.theme] || NT_THEMES.dark).bg);
   }
   saveNav();
   renderActivePanel();
@@ -5796,9 +5870,11 @@ function renderSettings() {
       <!-- Theme -->
       <div class="form-group">
         <label class="form-label">Theme</label>
-        <div class="toggle-group">
-          <button class="toggle-btn ${(state.settings.theme || 'dark') === 'dark' ? 'active' : ''}" onclick="setTheme('dark')">🌙 Dark</button>
+        <div class="toggle-group" style="display:flex;flex-wrap:wrap;">
           <button class="toggle-btn ${(state.settings.theme || 'dark') === 'light' ? 'active' : ''}" onclick="setTheme('light')">☀️ Light</button>
+          <button class="toggle-btn ${(state.settings.theme || 'dark') === 'sepia' ? 'active' : ''}" onclick="setTheme('sepia')">📜 Sepia</button>
+          <button class="toggle-btn ${(state.settings.theme || 'dark') === 'dark' ? 'active' : ''}" onclick="setTheme('dark')">🌙 Dark</button>
+          <button class="toggle-btn ${(state.settings.theme || 'dark') === 'black' ? 'active' : ''}" onclick="setTheme('black')">⬛ Black</button>
         </div>
       </div>
 
@@ -5865,25 +5941,56 @@ function renderSettings() {
 /* ========================================================================
    THEME & FONT
    ======================================================================== */
+const NT_THEMES = {
+  light: { cls: 'light', bg: '#f1f5f9', label: 'Light', sw: '#f1f5f9', ring: '#0f172a' },
+  sepia: { cls: 'sepia', bg: '#f4ecd8', label: 'Sepia', sw: '#f4ecd8', ring: '#3b3225' },
+  dark:  { cls: '',      bg: '#0f172a', label: 'Dark',  sw: '#0f172a', ring: '#e2e8f0' },
+  black: { cls: 'black', bg: '#000000', label: 'Black', sw: '#000000', ring: '#9a9aa4' }
+};
+const NT_THEME_ORDER = ['light', 'sepia', 'dark', 'black'];
 function applyTheme(theme) {
-  const isDark = (theme || state.settings.theme || 'dark') === 'dark';
-  document.documentElement.classList.toggle('light', !isDark);
-  // Swap sun/moon icons
-  const sun = document.getElementById('iconSun');
-  const moon = document.getElementById('iconMoon');
-  if (sun) sun.style.display = isDark ? 'block' : 'none';
-  if (moon) moon.style.display = isDark ? 'none' : 'block';
-  // Update meta theme-color
+  const key = NT_THEMES[theme || state.settings.theme] ? (theme || state.settings.theme) : 'dark';
+  const root = document.documentElement;
+  root.classList.remove('light', 'sepia', 'black');
+  if (NT_THEMES[key].cls) root.classList.add(NT_THEMES[key].cls);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', isDark ? '#0f172a' : '#f1f5f9');
+  if (meta && activeTab !== 'reader') meta.setAttribute('content', NT_THEMES[key].bg);
 }
 
-function toggleTheme() {
+function toggleTheme() { // header icon → open the theme picker
+  openThemeMenu();
+}
+function closeThemeMenu() {
+  const m = document.getElementById('themeMenu'); if (m) m.remove();
+  document.removeEventListener('click', closeThemeMenu);
+}
+function openThemeMenu(e) {
+  if (e) e.stopPropagation();
+  if (document.getElementById('themeMenu')) { closeThemeMenu(); return; }
+  const btn = document.getElementById('themeToggleBtn');
+  const r = btn.getBoundingClientRect();
   const cur = state.settings.theme || 'dark';
-  const next = cur === 'dark' ? 'light' : 'dark';
-  state.settings.theme = next;
-  applyTheme(next);
-  saveState();
+  const menu = document.createElement('div');
+  menu.id = 'themeMenu';
+  menu.className = 'header-menu open';
+  menu.style.position = 'fixed';
+  menu.style.top = (r.bottom + 6) + 'px';
+  menu.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+  menu.style.left = 'auto';
+  menu.style.width = '190px';
+  menu.style.zIndex = '200';
+  menu.innerHTML = '<div class="header-menu-label">Theme</div>' + NT_THEME_ORDER.map(k => {
+    const t = NT_THEMES[k];
+    return '<button class="header-menu-row" data-theme="' + k + '"><span class="hm-left">' +
+      '<span style="width:18px;height:18px;border-radius:50%;background:' + t.sw + ';border:1.5px solid ' + t.ring + ';display:inline-block;flex-shrink:0"></span>' +
+      '<span class="hm-name">' + t.label + '</span></span>' +
+      (cur === k ? '<span style="color:var(--primary);font-weight:700">✓</span>' : '') + '</button>';
+  }).join('');
+  document.body.appendChild(menu);
+  menu.querySelectorAll('[data-theme]').forEach(b => {
+    b.onclick = (ev) => { ev.stopPropagation(); setTheme(b.getAttribute('data-theme')); closeThemeMenu(); };
+  });
+  setTimeout(() => document.addEventListener('click', closeThemeMenu), 0);
 }
 
 function setTheme(t) {
