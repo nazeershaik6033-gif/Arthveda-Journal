@@ -338,12 +338,37 @@ function scanYtChannelId(raw){
     ||raw.match(/channel\/(UC[\w-]{20,})/);
   return m?m[1]:'';
 }
-/* Resolve a handle/name page to its UC… channel id. A single proxy often
-   returns a consent wall or truncated body with no id, so try every proxy
-   and keep going until one actually yields a channel id. */
+/* YouTube's own resolve_url endpoint maps a handle/custom URL straight to a
+   channel id as small JSON — and, unlike the public channel page, it isn't
+   gated behind the cookie-consent wall that breaks scraping through proxies.
+   Needs a POST, so route it through corsproxy.io (which forwards method+body). */
+const YT_INNERTUBE_KEY='AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+async function resolveYtViaApi(pageUrl){
+  const target='https://www.youtube.com/youtubei/v1/navigation/resolve_url?key='+YT_INNERTUBE_KEY+'&prettyPrint=false';
+  const body=JSON.stringify({context:{client:{clientName:'WEB',clientVersion:'2.20240726.00.00',hl:'en',gl:'US'}},url:pageUrl});
+  const wraps=[
+    u=>['https://corsproxy.io/?url='+encodeURIComponent(u),{}],
+    u=>['https://api.allorigins.win/raw?url='+encodeURIComponent(u),{}]
+  ];
+  for(const w of wraps){
+    try{
+      const [pu]=w(target);
+      const res=await fetchWithTimeout(pu,{method:'POST',headers:{'Content-Type':'application/json'},body},20000);
+      if(!res.ok)continue;
+      const txt=await res.text();
+      const m=txt.match(/"browseId":"(UC[\w-]{20,})"/)||txt.match(/"(?:channelId|externalId)":"(UC[\w-]{20,})"/);
+      if(m)return m[1];
+    }catch(e){}
+  }
+  return'';
+}
+/* Resolve a handle/name to its UC… channel id. Try the resolve_url API first
+   (small, consent-proof), then fall back to scraping the page through every
+   proxy and finally the Jina reader. */
 async function resolveYtChannelId(url){
   const direct=parseYtChannelId(url);if(direct)return direct;
   const u=ytTargetUrl(url);if(!u)return'';
+  const api=await resolveYtViaApi(u);if(api)return api;
   for(const p of PROXIES){
     try{
       const res=await fetchWithTimeout(p(u),{},25000);
@@ -353,6 +378,10 @@ async function resolveYtChannelId(url){
       if(id)return id;
     }catch(e){}
   }
+  try{
+    const res=await fetchWithTimeout('https://r.jina.ai/'+u,{},20000);
+    if(res.ok){const id=scanYtChannelId(await res.text());if(id)return id}
+  }catch(e){}
   return'';
 }
 async function fetchYtVideos(channelId){
