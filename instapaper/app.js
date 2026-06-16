@@ -321,17 +321,43 @@ async function resolveYtChannelId(url){
     return m?m[1]:'';
   }catch(e){return''}
 }
-async function fetchYtLatest(channelId){
+async function fetchYtVideos(channelId){
   const raw=await fetchRawHtml('https://www.youtube.com/feeds/videos.xml?channel_id='+channelId);
   const doc=new DOMParser().parseFromString(raw,'text/xml');
-  const entry=doc.getElementsByTagName('entry')[0];if(!entry)return null;
-  const tx=t=>{const n=entry.getElementsByTagName(t)[0];return n?(n.textContent||'').trim():''};
-  const videoId=tx('yt:videoId')||tx('videoId');if(!videoId)return null;
-  const tn=entry.getElementsByTagName('media:thumbnail')[0];
-  const thumb=(tn&&tn.getAttribute('url'))||('https://i.ytimg.com/vi/'+videoId+'/hqdefault.jpg');
-  return{videoId,title:tx('title'),published:tx('published'),thumb,fetchedAt:Date.now()};
+  const entries=[].slice.call(doc.getElementsByTagName('entry'),0,20);
+  return entries.map(entry=>{
+    const tx=t=>{const n=entry.getElementsByTagName(t)[0];return n?(n.textContent||'').trim():''};
+    const videoId=tx('yt:videoId')||tx('videoId');if(!videoId)return null;
+    const tn=entry.getElementsByTagName('media:thumbnail')[0];
+    const thumb=(tn&&tn.getAttribute('url'))||('https://i.ytimg.com/vi/'+videoId+'/hqdefault.jpg');
+    return{videoId,title:tx('title'),publishedMs:Date.parse(tx('published'))||0,thumb};
+  }).filter(Boolean);
 }
-const BRIEF0={groups:[],items:[],done:{day:'',ids:[]},yt:{},seen:{}};
+function tmin(t){const m=/^(\d{1,2}):(\d{2})/.exec(t||'');return m?(+m[1])*60+(+m[2]):0}
+function fmtClock(t){const m=/^(\d{1,2}):(\d{2})/.exec(t||'00:00');if(!m)return t||'';let h=+m[1];const ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+m[2]+' '+ap}
+/* Roll out every slot occurrence across yesterday→tomorrow, then locate, for the
+   selected slot, its most recent boundary (≤ now), the previous boundary (window
+   start), and the end of its window (next boundary, capped at now). */
+function briefWindow(slots,selId,now){
+  const sorted=(slots||[]).slice().sort((a,b)=>tmin(a.time)-tmin(b.time));
+  if(!sorted.length)return null;
+  const nowTs=now.getTime(),occ=[];
+  for(let off=-1;off<=1;off++){const d=new Date(now);d.setDate(d.getDate()+off);
+    for(const s of sorted){const t=new Date(d);t.setHours(0,0,0,0);t.setMinutes(tmin(s.time));occ.push({slot:s,ts:t.getTime(),date:ymd(t)})}}
+  occ.sort((a,b)=>a.ts-b.ts);
+  let activeIdx=-1;for(let i=0;i<occ.length;i++)if(occ[i].ts<=nowTs)activeIdx=i;
+  const activeSlotId=activeIdx>=0?occ[activeIdx].slot.id:sorted[sorted.length-1].id;
+  const sel=selId||activeSlotId;
+  let iIdx=-1;for(let i=0;i<occ.length;i++)if(occ[i].slot.id===sel&&occ[i].ts<=nowTs)iIdx=i;
+  if(iIdx<0){ // selected slot hasn't occurred yet today → upcoming
+    const up=occ.find(o=>o.slot.id===sel&&o.ts>nowTs);
+    return{activeSlotId,sel,future:up?up.ts:null,start:0,end:0,key:''};
+  }
+  const inst=occ[iIdx],prev=occ[iIdx-1],next=occ[iIdx+1];
+  return{activeSlotId,sel,future:null,start:prev?prev.ts:0,end:next?Math.min(next.ts,nowTs):nowTs,key:inst.date+'#'+sel,instTs:inst.ts};
+}
+const BRIEF_SLOTS0=[{id:'m',name:'Morning',time:'08:00'},{id:'a',name:'Afternoon',time:'14:00'},{id:'n',name:'Night',time:'20:00'}];
+const BRIEF0={groups:[],items:[],slots:BRIEF_SLOTS0.map(s=>({...s})),done:{key:'',ids:[]},yt:{},seen:{}};
 function extractFirstUrl(text){const m=String(text||'').match(/https?:\/\/[^\s"'<>]+/);return m?m[0]:''}
 function htmlToText(html){const d=document.createElement('div');d.innerHTML=html;return(d.textContent||'').replace(/\s+/g,' ').trim()}
 function countWords(text){const t=String(text||'').trim();return t?t.split(/\s+/).length:0}
@@ -673,6 +699,9 @@ function loadStore(){
       .map((s,i)=>({id:uid(),groupId:gid,kind:'link',name:s[0],url:s[1],channelId:'',addedAt:now+i}));
   }
   d.brief.seeded=true;
+  if(!Array.isArray(d.brief.slots)||!d.brief.slots.length)d.brief.slots=BRIEF_SLOTS0.map(s=>({...s}));
+  if(!d.brief.done||typeof d.brief.done!=='object'||!('key'in d.brief.done))d.brief.done={key:'',ids:[]};
+  if(!d.brief.yt||typeof d.brief.yt!=='object')d.brief.yt={};
   if(!d.seeded){d.articles.unshift(makeSeed());d.seeded=true}
   return d;
 }
@@ -1640,24 +1669,27 @@ function Ring({T,frac,size}){
     h('circle',{cx:size/2,cy:size/2,r,fill:'none',stroke:T.hair,strokeWidth:3}),
     h('circle',{cx:size/2,cy:size/2,r,fill:'none',stroke:T.accent,strokeWidth:3,strokeLinecap:'round',strokeDasharray:c,strokeDashoffset:c*(1-clamp(frac,0,1)),style:{transition:'stroke-dashoffset .3s'}}));
 }
-function BriefItem({T,item,latest,isNew,done,onToggle,onOpen,onWatch,onLongPress}){
+function BriefItem({T,item,videos,done,onToggle,onOpen,onWatch,onLongPress}){
   const lp=useLongPress(onLongPress);
   const check=h('button',{onClick:e=>{e.stopPropagation();onToggle()},className:'act90',style:{display:'flex',flexShrink:0,color:done?T.accent:T.sub,padding:2,marginTop:1}},Icons.checkCircle(24,done));
   if(item.kind==='youtube'){
+    const vids=videos||[];
     return h('div',Object.assign({},lp,{style:{display:'flex',gap:8,padding:'10px 4px',alignItems:'flex-start'}}),check,
       h('div',{style:{flex:1,minWidth:0}},
         h('div',{onClick:onOpen,style:{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}},
           h('span',{style:{color:'#d4564a',display:'flex',flexShrink:0}},Icons.video(15)),
           h('div',{style:{fontSize:14,fontWeight:600,color:T.fg,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',opacity:done?.55:1}},item.name),
-          isNew?h('span',{style:{flexShrink:0,fontSize:9,fontWeight:700,letterSpacing:'.04em',color:'#fff',background:'#d4564a',borderRadius:5,padding:'2px 5px'}},'NEW'):null),
-        latest?h('button',{onClick:onWatch,className:'act98',style:{display:'flex',gap:0,marginTop:7,width:'100%',textAlign:'left',background:T.card,borderRadius:10,overflow:'hidden'}},
-          h('div',{style:{width:104,flexShrink:0,position:'relative',background:T.hair,aspectRatio:'16 / 9'}},
-            latest.thumb?h('img',{src:latest.thumb,alt:'',style:{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'},onError:e=>{e.target.style.opacity=0}}):null,
-            h('span',{style:{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',filter:'drop-shadow(0 1px 3px rgba(0,0,0,.6))'}},Icons.play(20,true))),
-          h('div',{style:{flex:1,minWidth:0,padding:'7px 10px'}},
-            h('div',{style:{fontSize:12.5,color:T.fg,lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}},latest.title||'Latest video'),
-            latest.published?h('div',{style:{fontSize:11,color:T.sub,marginTop:3}},fmtDateShort(Date.parse(latest.published))):null))
-          :h('div',{onClick:onOpen,style:{marginTop:5,fontSize:12,color:T.sub,cursor:'pointer'}},item.channelId?'Latest video loads when you’re online.':'Tap to open channel.')));
+          vids.length?h('span',{style:{flexShrink:0,fontSize:9,fontWeight:700,color:'#fff',background:'#d4564a',borderRadius:5,padding:'2px 6px'}},vids.length+' new'):null),
+        vids.length?h('div',{style:{marginTop:7,display:'flex',flexDirection:'column',gap:6}},
+          vids.slice(0,6).map(v=>h('button',{key:v.videoId,onClick:()=>onWatch(v),className:'act98',style:{display:'flex',width:'100%',textAlign:'left',background:T.card,borderRadius:10,overflow:'hidden'}},
+            h('div',{style:{width:92,flexShrink:0,position:'relative',background:T.hair,aspectRatio:'16 / 9'}},
+              v.thumb?h('img',{src:v.thumb,alt:'',style:{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover'},onError:e=>{e.target.style.opacity=0}}):null,
+              h('span',{style:{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',filter:'drop-shadow(0 1px 3px rgba(0,0,0,.6))'}},Icons.play(18,true))),
+            h('div',{style:{flex:1,minWidth:0,padding:'6px 10px'}},
+              h('div',{style:{fontSize:12.5,color:T.fg,lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}},v.title||'Video'),
+              v.publishedMs?h('div',{style:{fontSize:11,color:T.sub,marginTop:3}},fmtDateShort(v.publishedMs)):null))),
+          vids.length>6?h('button',{onClick:onOpen,style:{fontSize:12,color:T.accent,fontWeight:600,textAlign:'left',padding:'2px'}},'+'+(vids.length-6)+' more on the channel'):null)
+        :h('div',{onClick:onOpen,style:{marginTop:5,fontSize:12,color:T.sub,cursor:'pointer'}},item.channelId?'No new videos since the last brief.':'Tap to open channel.')));
   }
   return h('div',Object.assign({},lp,{style:{display:'flex',gap:10,padding:'11px 4px',alignItems:'center'}}),check,
     h('div',{onClick:onOpen,style:{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:11,cursor:'pointer'}},
@@ -1669,29 +1701,36 @@ function BriefItem({T,item,latest,isNew,done,onToggle,onOpen,onWatch,onLongPress
     h('span',{onClick:onOpen,style:{color:T.sub,display:'flex',cursor:'pointer',flexShrink:0}},Icons.external(17)));
 }
 function BriefView({T,brief,onBrief,toastFn}){
-  const groups=brief.groups||[],items=brief.items||[],yt=brief.yt||{},seen=brief.seen||{};
-  const today=ymd(new Date());
-  const doneIds=(brief.done&&brief.done.day===today)?brief.done.ids:[];
+  const groups=brief.groups||[],items=brief.items||[],yt=brief.yt||{};
+  const slots=(brief.slots&&brief.slots.length?brief.slots:BRIEF_SLOTS0).slice().sort((a,b)=>tmin(a.time)-tmin(b.time));
+  const now=new Date();
+  const [sel,setSel]=useState(null); // slot id being viewed (null = current/active)
+  const win=briefWindow(slots,sel,now)||{activeSlotId:'',sel:'',start:0,end:0,key:'',future:null};
+  const curSlot=slots.find(s=>s.id===win.sel)||slots[0]||{name:'Brief',time:'00:00'};
+  const doneIds=(brief.done&&brief.done.key===win.key&&win.key)?brief.done.ids:[];
   const [act,setAct]=useState(null);
   const [moveIt,setMoveIt]=useState(null);
-  const [edit,setEdit]=useState(null); // {id?,groupId,kind,name,url}
-  const [grp,setGrp]=useState(null); // {} new · {rename:id}
+  const [edit,setEdit]=useState(null);
+  const [grp,setGrp]=useState(null);
   const [gName,setGName]=useState('');
   const [busy,setBusy]=useState(false);
-  useEffect(()=>{ // best-effort refresh of each channel's latest video
+  const [slotSheet,setSlotSheet]=useState(false);
+  useEffect(()=>{ // best-effort refresh of each channel's recent videos
     let live=true;
     (async()=>{for(const it of items){
       if(it.kind!=='youtube'||!it.channelId)continue;
       const c=yt[it.channelId];if(c&&Date.now()-(c.fetchedAt||0)<20*60*1000)continue;
-      try{const v=await fetchYtLatest(it.channelId);if(v&&live)onBrief(b=>({...b,yt:{...(b.yt||{}),[it.channelId]:v}}))}catch(e){}
+      try{const vs=await fetchYtVideos(it.channelId);if(vs&&live)onBrief(b=>({...b,yt:{...(b.yt||{}),[it.channelId]:{fetchedAt:Date.now(),videos:vs}}}))}catch(e){}
     }})();
     return()=>{live=false};
   },[]);
-  const toggle=id=>onBrief(b=>{const cur=(b.done&&b.done.day===today)?b.done.ids:[];const ids=cur.includes(id)?cur.filter(x=>x!==id):cur.concat([id]);return{...b,done:{day:today,ids}}});
+  const newVids=it=>{const c=yt[it.channelId];if(!c||!c.videos)return[];return c.videos.filter(v=>v.publishedMs>=win.start&&v.publishedMs<=win.end).sort((a,b)=>b.publishedMs-a.publishedMs)};
+  const toggle=id=>{if(!win.key)return;onBrief(b=>{const cur=(b.done&&b.done.key===win.key)?b.done.ids:[];const ids=cur.includes(id)?cur.filter(x=>x!==id):cur.concat([id]);return{...b,done:{key:win.key,ids}}})};
   const open=it=>{const u=normalizeUrl(it.url);if(u)openExternalUrl(u)};
-  const watch=it=>{const v=yt[it.channelId];if(!v)return open(it);onBrief(b=>({...b,seen:{...(b.seen||{}),[it.channelId]:v.videoId}}));openExternalUrl('https://www.youtube.com/watch?v='+v.videoId)};
+  const watch=v=>openExternalUrl('https://www.youtube.com/watch?v='+v.videoId);
   const removeItem=id=>onBrief(b=>({...b,items:b.items.filter(x=>x.id!==id)}));
   const setItemGroup=(id,groupId)=>onBrief(b=>({...b,items:b.items.map(x=>x.id===id?{...x,groupId}:x)}));
+  const setSlot=(id,patch)=>onBrief(b=>({...b,slots:(b.slots||[]).map(s=>s.id===id?{...s,...patch}:s)}));
   const saveItem=async f=>{
     const url=normalizeUrl(f.url);if(!url){toastFn('Enter a valid link');return}
     let channelId=f.channelId||'';
@@ -1700,14 +1739,14 @@ function BriefView({T,brief,onBrief,toastFn}){
     if(f.id)onBrief(b=>({...b,items:b.items.map(x=>x.id===f.id?{...x,name,url,kind:f.kind,channelId}:x)}));
     else onBrief(b=>({...b,items:b.items.concat([{id:uid(),groupId:f.groupId||null,kind:f.kind,name,url,channelId,addedAt:Date.now()}])}));
     setEdit(null);
-    if(f.kind==='youtube'&&channelId&&!yt[channelId]){try{const v=await fetchYtLatest(channelId);if(v)onBrief(b=>({...b,yt:{...(b.yt||{}),[channelId]:v}}))}catch(e){}}
+    if(f.kind==='youtube'&&channelId){try{const vs=await fetchYtVideos(channelId);if(vs)onBrief(b=>({...b,yt:{...(b.yt||{}),[channelId]:{fetchedAt:Date.now(),videos:vs}}}))}catch(e){}}
   };
   const total=items.length,doneN=items.filter(i=>doneIds.includes(i.id)).length;
-  const newCount=items.filter(i=>i.kind==='youtube'&&i.channelId&&yt[i.channelId]&&seen[i.channelId]!==yt[i.channelId].videoId).length;
+  const newCount=win.future?0:items.reduce((n,it)=>n+(it.kind==='youtube'?newVids(it).length:0),0);
   const sections=groups.map(g=>({g,list:items.filter(i=>i.groupId===g.id)}));
   const ungrouped=items.filter(i=>!i.groupId||!groups.some(g=>g.id===i.groupId));
   if(ungrouped.length)sections.push({g:null,list:ungrouped});
-  const itemRow=it=>h(BriefItem,{key:it.id,T,item:it,latest:yt[it.channelId],isNew:it.kind==='youtube'&&it.channelId&&yt[it.channelId]&&seen[it.channelId]!==yt[it.channelId].videoId,done:doneIds.includes(it.id),onToggle:()=>toggle(it.id),onOpen:()=>open(it),onWatch:()=>watch(it),onLongPress:()=>setAct(it)});
+  const itemRow=it=>h(BriefItem,{key:it.id,T,item:it,videos:win.future?[]:newVids(it),done:doneIds.includes(it.id),onToggle:()=>toggle(it.id),onOpen:()=>open(it),onWatch:watch,onLongPress:()=>setAct(it)});
   const sectionHead=(g,list)=>h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'14px 4px 4px'}},
     h('div',{style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},(g?g.name:'Other')+' · '+list.filter(i=>doneIds.includes(i.id)).length+'/'+list.length),
     g?h('button',{onClick:()=>{setGName(g.name);setGrp({rename:g.id})},className:'act90',style:{display:'flex',color:T.sub,padding:3}},Icons.pencil(16)):null,
@@ -1715,25 +1754,42 @@ function BriefView({T,brief,onBrief,toastFn}){
     h('button',{onClick:()=>setEdit({groupId:g?g.id:null,kind:'link',name:'',url:''}),className:'act90',style:{display:'flex',color:T.accent,padding:3}},Icons.plus(18)));
 
   return h('div',null,
-    h('div',{style:{display:'flex',alignItems:'center',gap:12,padding:'8px 16px 4px'}},
+    h('div',{className:'sx',style:{display:'flex',gap:7,overflowX:'auto',padding:'8px 14px 2px'}},
+      slots.map(s=>h('button',{key:s.id,onClick:()=>setSel(s.id),className:'act95',style:{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:1,padding:'7px 13px',borderRadius:11,border:'1px solid '+(s.id===win.sel?T.accent:T.hair),background:s.id===win.sel?T.card:'transparent'}},
+        h('span',{style:{fontSize:13,fontWeight:600,color:s.id===win.sel?T.fg:T.sub}},s.name+(s.id===win.activeSlotId?' •':'')),
+        h('span',{style:{fontSize:10.5,color:T.sub}},fmtClock(s.time)))),
+      h('button',{onClick:()=>setSlotSheet(true),className:'act90',style:{flexShrink:0,display:'flex',alignItems:'center',color:T.sub,padding:'0 6px'}},Icons.calendar(18))),
+    h('div',{style:{display:'flex',alignItems:'center',gap:12,padding:'6px 16px 4px'}},
       h('div',{style:{position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}},
         h(Ring,{T,frac:total?doneN/total:0,size:46}),
         h('div',{style:{position:'absolute',fontSize:12,fontWeight:700,color:T.fg}},doneN+'/'+(total||0))),
       h('div',{style:{flex:1,minWidth:0}},
-        h('div',{style:{fontSize:15.5,fontWeight:600,color:T.fg}},new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})),
-        h('div',{style:{fontSize:12.5,color:T.sub,marginTop:1}},total?(doneN===total?'All done for today 🎉':doneN+' of '+total+' done'+(newCount?' · '+newCount+' new':'')):'Add the sites, apps and channels you check daily.')),
+        h('div',{style:{fontSize:15.5,fontWeight:600,color:T.fg}},curSlot.name+' brief'),
+        h('div',{style:{fontSize:12.5,color:T.sub,marginTop:1}},win.future?('Starts at '+fmtClock(curSlot.time)+' today'):(total?(doneN===total?'All done 🎉':doneN+' of '+total+' done')+(newCount?' · '+newCount+' new since '+(win.start?fmtClock(new Date(win.start).getHours()+':'+String(new Date(win.start).getMinutes()).padStart(2,'0')):'last brief'):''):'Add the sites, apps and channels you check.'))),
       newCount?h('span',{style:{flexShrink:0,fontSize:11,fontWeight:700,color:'#fff',background:'#d4564a',borderRadius:999,padding:'3px 9px'}},newCount+' new'):null),
-    h('div',{style:{padding:'4px 14px 0'}},
+    h('div',{style:{padding:'2px 14px 0'}},
+      win.future?h('div',{style:{fontSize:12.5,color:T.sub,background:T.card,borderRadius:10,padding:'10px 12px',margin:'6px 2px',lineHeight:1.45}},'This brief begins at '+fmtClock(curSlot.time)+'. New videos since your last brief will appear here then.'):null,
       total?sections.map(({g,list})=>h('div',{key:g?g.id:'_other'},sectionHead(g,list),list.length?list.map(itemRow):h('div',{style:{fontSize:12.5,color:T.sub,padding:'6px 4px 10px'}},'Nothing here yet — tap + to add.')))
-        :h(EmptyState,{T,icon:Icons.sun(40),title:'Your daily brief',sub:'Group the social apps, websites and YouTube channels you go through each morning, then check them off.'}),
+        :h(EmptyState,{T,icon:Icons.sun(40),title:'Your daily brief',sub:'Group the social apps, websites and YouTube channels you go through each day, then check them off.'}),
       h('button',{onClick:()=>{setGName('');setGrp({})},className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:18,padding:'11px 14px',borderRadius:11,border:'1px dashed '+T.hair,color:T.fg,fontSize:14,fontWeight:500}},Icons.plus(18),'New group'),
       h('button',{onClick:()=>setEdit({groupId:groups[0]?groups[0].id:null,kind:'link',name:'',url:''}),className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:10,padding:'11px 14px',borderRadius:11,background:T.card,color:T.fg,fontSize:14,fontWeight:600}},Icons.plus(18),'Add item'),
       h('div',{style:{height:'calc(24px + '+SAFE_B+')'}})),
 
+    slotSheet?h(Sheet,{T,title:'Brief times',maxH:'90%',onClose:()=>setSlotSheet(false)},
+      h('div',{style:{padding:'0 16px calc(18px + '+SAFE_B+')'}},
+        h('div',{style:{fontSize:12.5,color:T.sub,margin:'2px 2px 12px',lineHeight:1.45}},'Each brief shows everything new since the previous one. Add as many as you like.'),
+        slots.map(s=>h('div',{key:s.id,style:{display:'flex',alignItems:'center',gap:8,marginBottom:10}},
+          h('input',{value:s.name,onChange:e=>setSlot(s.id,{name:e.target.value}),placeholder:'Name',
+            style:{flex:1,minWidth:0,border:'1px solid '+T.hair,background:T.card,color:T.fg,borderRadius:10,padding:'10px 12px',fontSize:14.5}}),
+          h('input',{type:'time',value:s.time,onChange:e=>setSlot(s.id,{time:e.target.value||s.time}),
+            style:{border:'1px solid '+T.hair,background:T.card,color:T.fg,borderRadius:10,padding:'10px 10px',fontSize:14.5,colorScheme:(T.id==='dark'||T.id==='black')?'dark':'light'}}),
+          (brief.slots||[]).length>1?h('button',{onClick:()=>{if(sel===s.id)setSel(null);onBrief(b=>({...b,slots:(b.slots||[]).filter(x=>x.id!==s.id)}))},className:'act90',style:{display:'flex',color:T.danger,padding:5}},Icons.trash(18)):null)),
+        h('button',{onClick:()=>onBrief(b=>({...b,slots:(b.slots||[]).concat([{id:uid(),name:'Brief',time:'12:00'}])})),className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:6,padding:'11px 14px',borderRadius:11,border:'1px dashed '+T.hair,color:T.fg,fontSize:14,fontWeight:500}},Icons.plus(18),'Add a brief'))):null,
+
     act?h(Sheet,{T,onClose:()=>setAct(null)},
       h('div',{style:{padding:'6px 20px 12px',borderBottom:'1px solid '+T.hair,fontSize:14.5,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},act.name),
       h(ARow,{T,icon:Icons.external(21),label:act.kind==='youtube'?'Open channel':'Open',onClick:()=>{const it=act;setAct(null);open(it)}}),
-      act.kind==='youtube'&&yt[act.channelId]?h(ARow,{T,icon:Icons.play(21,true),label:'Watch latest video',onClick:()=>{const it=act;setAct(null);watch(it)}}):null,
+      act.kind==='youtube'&&yt[act.channelId]&&yt[act.channelId].videos&&yt[act.channelId].videos[0]?h(ARow,{T,icon:Icons.play(21,true),label:'Watch latest video',onClick:()=>{const v=yt[act.channelId].videos[0];setAct(null);watch(v)}}):null,
       h(ARow,{T,icon:Icons.checkCircle(21,doneIds.includes(act.id)),label:doneIds.includes(act.id)?'Mark not done':'Mark done',onClick:()=>{toggle(act.id);setAct(null)}}),
       h(ARow,{T,icon:Icons.pencil(21),label:'Edit',onClick:()=>{const it=act;setAct(null);setEdit({id:it.id,groupId:it.groupId,kind:it.kind,name:it.name,url:it.url,channelId:it.channelId})}}),
       h(ARow,{T,icon:Icons.folder(21),label:'Move to group…',onClick:()=>{const it=act;setAct(null);setMoveIt(it)}}),
