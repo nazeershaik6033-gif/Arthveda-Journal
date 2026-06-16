@@ -663,6 +663,16 @@ function loadStore(){
   d.sites=Array.isArray(d.sites)?d.sites:[];
   d.siteFolders=Array.isArray(d.siteFolders)?d.siteFolders:[];
   d.vault=d.vault&&d.vault.ct?d.vault:null;
+  if(!d.brief||typeof d.brief!=='object')d.brief={};
+  d.brief.groups=Array.isArray(d.brief.groups)?d.brief.groups:[];
+  d.brief.items=Array.isArray(d.brief.items)?d.brief.items:[];
+  if(!d.brief.seeded&&!d.brief.items.length){ // first run: seed a Social group
+    const gid=uid(),now=Date.now();
+    d.brief.groups=[{id:gid,name:'Social'}].concat(d.brief.groups);
+    d.brief.items=[['YouTube','https://www.youtube.com'],['Telegram','https://web.telegram.org'],['Instagram','https://www.instagram.com'],['X','https://x.com'],['WhatsApp','https://web.whatsapp.com']]
+      .map((s,i)=>({id:uid(),groupId:gid,kind:'link',name:s[0],url:s[1],channelId:'',addedAt:now+i}));
+  }
+  d.brief.seeded=true;
   if(!d.seeded){d.articles.unshift(makeSeed());d.seeded=true}
   return d;
 }
