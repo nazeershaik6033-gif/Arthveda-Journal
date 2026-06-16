@@ -2554,7 +2554,8 @@ function openReaderMenu(e) {
   const ic = {
     home: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>',
     browse: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.3 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.3-3.6-8.5S9.6 5.8 12 3.5Z"/></svg>',
-    photos: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/><circle cx="8.5" cy="9.5" r="1.4"/><path d="M4 16.5 9 12l3.5 3 3-2.5 4.5 4"/></svg>'
+    photos: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/><circle cx="8.5" cy="9.5" r="1.4"/><path d="M4 16.5 9 12l3.5 3 3-2.5 4.5 4"/></svg>',
+    brief: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg>'
   };
   const menu = document.createElement('div');
   menu.id = 'readerMenu';
@@ -2569,7 +2570,8 @@ function openReaderMenu(e) {
     '<div class="header-menu-label">Reader</div>' +
     '<button class="header-menu-row" data-scope="home"><span class="hm-left">' + ic.home + '<span class="hm-name">Home</span></span></button>' +
     '<button class="header-menu-row" data-scope="browse"><span class="hm-left">' + ic.browse + '<span class="hm-name">Browser</span></span></button>' +
-    '<button class="header-menu-row" data-scope="photos"><span class="hm-left">' + ic.photos + '<span class="hm-name">Photos</span></span></button>';
+    '<button class="header-menu-row" data-scope="photos"><span class="hm-left">' + ic.photos + '<span class="hm-name">Photos</span></span></button>' +
+    '<button class="header-menu-row" data-scope="brief"><span class="hm-left">' + ic.brief + '<span class="hm-name">Daily Brief</span></span></button>';
   document.body.appendChild(menu);
   menu.querySelectorAll('[data-scope]').forEach(b => {
     b.onclick = (ev) => { ev.stopPropagation(); const s = b.getAttribute('data-scope'); closeReaderMenu(); openReaderAt(s); };
