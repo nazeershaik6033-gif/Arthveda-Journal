@@ -1780,6 +1780,10 @@ table.data-table tr:last-child td { border-bottom: none; }
   padding: 12px 14px; font-size: 13px; color: var(--text); margin-bottom: 14px;
 }
 .ai-nokey a { color: var(--primary); cursor: pointer; }
+.ai-result-actions {
+  display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+}
+.ai-result-actions .btn { font-size: 12px; padding: 6px 12px; }
 </style>
 </head>
 <body>
@@ -1920,6 +1924,15 @@ const ICONS = {
   cog:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   read: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
 };
+
+// ---- THEME CONSTANTS (must be defined before switchTab uses them) ----
+const NT_THEMES = {
+  light: { cls: 'light', bg: '#f1f5f9', label: 'Light', sw: '#f1f5f9', ring: '#0f172a' },
+  sepia: { cls: 'sepia', bg: '#f4ecd8', label: 'Sepia', sw: '#f4ecd8', ring: '#3b3225' },
+  dark:  { cls: '',      bg: '#0f172a', label: 'Dark',  sw: '#0f172a', ring: '#e2e8f0' },
+  black: { cls: 'black', bg: '#000000', label: 'Black', sw: '#000000', ring: '#9a9aa4' }
+};
+const NT_THEME_ORDER = ['light', 'sepia', 'dark', 'black'];
 
 // ---- DEFAULT STATE ----
 const DEFAULT_STATE = {
@@ -2809,23 +2822,33 @@ function renderCurrentHoldings() {
       const current = live ? Number(p.qty) * live.price : invested;
       const pnl = current - invested;
       const pct = invested ? (pnl / invested) * 100 : 0;
+      const uid = 'dh-core-' + p.id;
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span class="mono" style="font-weight:600;">${escapeHtml(p.symbol)}</span>
-                ${tvBtn(p.symbol)}
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                <span class="badge primary" style="font-size:9px;padding:1px 5px;">CORE</span>
-                <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(String(p.qty))} @ ${formatINR(p.avgPrice)}</span>
+        <div style="border-bottom:1px solid var(--border-subtle);">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer;"
+               onclick="(function(){const el=document.getElementById('${uid}');el.style.display=el.style.display==='none'?'flex':'none';})()">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span class="mono" style="font-weight:600;">${escapeHtml(p.symbol)}</span>
+                  ${tvBtn(p.symbol)}
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                  <span class="badge primary" style="font-size:9px;padding:1px 5px;">CORE</span>
+                  <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(String(p.qty))} @ ${formatINR(p.avgPrice)}</span>
+                </div>
               </div>
             </div>
+            <div style="text-align:right;">
+              <div class="mono ${pnlClass(pnl)}" style="font-weight:700;">${formatPnl(pnl)}</div>
+              <div class="mono ${pnlClass(pct)}" style="font-size:11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
+            </div>
           </div>
-          <div style="text-align:right;">
-            <div class="mono ${pnlClass(pnl)}" style="font-weight:700;">${formatPnl(pnl)}</div>
-            <div class="mono ${pnlClass(pct)}" style="font-size:11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>
+          <div id="${uid}" style="display:none;flex-wrap:wrap;gap:8px;padding:0 0 10px;">
+            <button class="btn btn-success btn-sm" onclick="openCloseCoreModal('${p.id}')">Sell / Close</button>
+            <button class="btn btn-ghost btn-sm" onclick="openEditPortfolioModal('${p.id}')">Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="moveCoreToSatellite('${p.id}')">→ Satellite</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePortfolioPrompt('${p.id}')">Delete</button>
           </div>
         </div>`;
     }),
@@ -2835,22 +2858,32 @@ function renderCurrentHoldings() {
       const current = live ? Number(t.entryQty) * live.price : invested;
       const pnl = current - invested;
       const pct = invested ? (pnl / invested) * 100 : 0;
+      const uid = 'dh-sat-' + t.id;
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span class="mono" style="font-weight:600;">${escapeHtml(t.symbol)}</span>
-                ${tvBtn(t.symbol)}
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
-                <span class="badge warning" style="font-size:9px;padding:1px 5px;">SAT</span>
-                <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(String(t.entryQty))} @ ${formatINR(t.entryPrice)}</span>
+        <div style="border-bottom:1px solid var(--border-subtle);">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;cursor:pointer;"
+               onclick="(function(){const el=document.getElementById('${uid}');el.style.display=el.style.display==='none'?'flex':'none';})()">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span class="mono" style="font-weight:600;">${escapeHtml(t.symbol)}</span>
+                  ${tvBtn(t.symbol)}
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                  <span class="badge warning" style="font-size:9px;padding:1px 5px;">SAT</span>
+                  <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(String(t.entryQty))} @ ${formatINR(t.entryPrice)}</span>
+                </div>
               </div>
             </div>
+            <div style="text-align:right;">
+              ${live ? `<div class="mono ${pnlClass(pnl)}" style="font-weight:700;">${formatPnl(pnl)}</div><div class="mono ${pnlClass(pct)}" style="font-size:11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>` : `<div style="color:var(--text-muted);font-size:12px;">No live price</div>`}
+            </div>
           </div>
-          <div style="text-align:right;">
-            ${live ? `<div class="mono ${pnlClass(pnl)}" style="font-weight:700;">${formatPnl(pnl)}</div><div class="mono ${pnlClass(pct)}" style="font-size:11px;">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</div>` : `<div style="color:var(--text-muted);font-size:12px;">No live price</div>`}
+          <div id="${uid}" style="display:none;flex-wrap:wrap;gap:8px;padding:0 0 10px;">
+            <button class="btn btn-success btn-sm" onclick="openCloseTradeModal('${t.id}')">Close Trade</button>
+            <button class="btn btn-ghost btn-sm" onclick="openEditTradeModal('${t.id}')">Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="moveSatelliteToCore('${t.id}')">→ Core</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteTradePrompt('${t.id}')">Delete</button>
           </div>
         </div>`;
     })
@@ -3305,7 +3338,54 @@ function renderTradesContent(tags) {
       <button class="btn" onclick="switchTab('entry')">+ Add Trade</button>
     </div>`;
   } else {
-    html += trades.map(t => renderTradeCard(t)).join('');
+    // For satellite closed: show summary stats + dedicated closed cards (matching Core Closed style)
+    if (status === 'closed') {
+      const totalPnl = trades.reduce((s, t) => s + (Number(t.realizedPnl) || 0), 0);
+      html += `
+        <div class="stat-grid" style="margin-bottom: 12px;">
+          <div class="stat-card"><div class="stat-label">Closed Records</div><div class="stat-value">${trades.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Total Realized P&amp;L</div><div class="stat-value ${pnlClass(totalPnl)}">${formatPnl(totalPnl)}</div></div>
+        </div>
+        ${trades.map(t => `
+          <div class="trade-card animate-fade-up">
+            <div class="trade-header">
+              <div>
+                <div class="trade-symbol-row"><div class="trade-symbol">${escapeHtml(t.symbol)}</div>${tvBtn(t.symbol)}</div>
+                ${t.tradeName ? `<div class="trade-name">${escapeHtml(t.tradeName)}</div>` : ''}
+              </div>
+              <div class="trade-badges">
+                <span class="badge primary">SATELLITE</span>
+                <span class="badge success">CLOSED</span>
+                <span class="badge ${(Number(t.realizedPnl)||0) >= 0 ? 'success' : 'error'}">${formatPnl(t.realizedPnl)}</span>
+              </div>
+            </div>
+            <div class="trade-grid">
+              <div><div class="trade-field-label">Entry Price</div><div class="trade-field-value">${formatINR(t.entryPrice)}</div></div>
+              <div><div class="trade-field-label">Exit Price</div><div class="trade-field-value">${formatINR(t.exitPrice)}</div></div>
+              <div><div class="trade-field-label">Qty</div><div class="trade-field-value">${escapeHtml(String(t.exitQty || t.entryQty))}</div></div>
+              <div><div class="trade-field-label">Entry Date</div><div class="trade-field-value">${formatDate(t.entryDate, { day:'2-digit', month:'short', year:'2-digit' })}</div></div>
+              <div><div class="trade-field-label">Exit Date</div><div class="trade-field-value">${formatDate(t.closedAt || t.exitDate, { day:'2-digit', month:'short', year:'2-digit' })}</div></div>
+              <div><div class="trade-field-label">Category</div><div class="trade-field-value">${escapeHtml(t.category || 'stocks')}</div></div>
+            </div>
+            ${(t.tags && t.tags.length) ? `<div class="trade-tags">${t.tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
+            ${t.entryDesc ? `<div class="trade-desc"><strong style="color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Entry:</strong>
+${escapeHtml(t.entryDesc)}</div>` : ''}
+            ${t.exitDesc ? `<div class="trade-desc"><strong style="color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;">Exit:</strong>
+${escapeHtml(t.exitDesc)}</div>` : ''}
+            ${(t.entryChart || t.exitChart) ? `<div class="trade-charts">
+              ${t.entryChart ? `<img class="trade-chart-thumb" src="${t.entryChart}" alt="Entry" onclick="openLightbox('${t.id}','entry')">` : ''}
+              ${t.exitChart ? `<img class="trade-chart-thumb" src="${t.exitChart}" alt="Exit" onclick="openLightbox('${t.id}','exit')">` : ''}
+            </div>` : ''}
+            <div class="trade-actions">
+              <button class="btn btn-ghost btn-sm" onclick="openEditTradeModal('${t.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteTradePrompt('${t.id}')">Delete</button>
+            </div>
+          </div>
+        `).join('')}
+      `;
+    } else {
+      html += trades.map(t => renderTradeCard(t)).join('');
+    }
   }
   container.innerHTML = html;
 }
@@ -3371,6 +3451,7 @@ function renderTradeCard(t) {
 
       <div class="trade-actions">
         ${t.status === 'open' ? `<button class="btn btn-success btn-sm" onclick="openCloseTradeModal('${t.id}')">Close Trade</button>` : ''}
+        ${t.status === 'open' ? `<button class="btn btn-ghost btn-sm" onclick="moveSatelliteToCore('${t.id}')">→ Core</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="openEditTradeModal('${t.id}')">Edit</button>
         <button class="btn btn-ghost btn-sm" onclick="addTagPrompt('${t.id}')">+ Tag</button>
         <button class="btn btn-danger btn-sm" onclick="deleteTradePrompt('${t.id}')">Delete</button>
@@ -3419,6 +3500,7 @@ function renderCorePortfolio() {
         <div class="trade-actions">
           <button class="btn btn-success btn-sm" onclick="openCloseCoreModal('${p.id}')">Sell / Close</button>
           <button class="btn btn-ghost btn-sm" onclick="openEditPortfolioModal('${p.id}')">Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="moveCoreToSatellite('${p.id}')">→ Satellite</button>
           <button class="btn btn-danger btn-sm" onclick="deletePortfolioPrompt('${p.id}')">Delete</button>
         </div>
       </div>
@@ -3527,9 +3609,8 @@ function openCloseCoreModal(id) {
         <div class="drop-zone" id="ccDropZone">
           <div style="text-align:center; color: var(--text-muted);">
             <div style="font-size: 24px; margin-bottom: 4px;">📷</div>
-            <div style="font-size: 13px;">Drop image or click to upload</div>
+            <div style="font-size: 13px;">Tap or drag image to upload</div>
           </div>
-          <input type="file" id="ccChartInput" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;">
         </div>
         <div id="ccChartPreview" style="margin-top: 8px;"></div>
       </div>
@@ -3559,15 +3640,21 @@ function openCloseCoreModal(id) {
     e.target.dataset.manual = e.target.value ? '1' : '';
   };
 
-  // Chart upload
-  const dropZone = document.getElementById('ccDropZone');
-  const chartInput = document.getElementById('ccChartInput');
+  // Chart upload — iOS-safe: spawn a fresh input on every tap (no overlay input blocking other buttons)
   const setupChart = async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
     exitChartData = await readFileAsBase64(file);
     document.getElementById('ccChartPreview').innerHTML = `<img src="${exitChartData}" style="width:100%; border-radius:8px; max-height:180px; object-fit:cover;">`;
   };
-  chartInput.onchange = (e) => { if (e.target.files[0]) setupChart(e.target.files[0]); };
+  const dropZone = document.getElementById('ccDropZone');
+  dropZone.onclick = () => {
+    const fresh = document.createElement('input');
+    fresh.type = 'file'; fresh.accept = 'image/*';
+    fresh.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+    document.body.appendChild(fresh);
+    fresh.onchange = (e) => { if (e.target.files[0]) setupChart(e.target.files[0]); document.body.removeChild(fresh); };
+    fresh.click();
+  };
   dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
   dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
   dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = ''; if (e.dataTransfer.files[0]) setupChart(e.dataTransfer.files[0]); });
@@ -3838,7 +3925,26 @@ function setupDropZone(zoneId, inputId, callback) {
   const zone = document.getElementById(zoneId);
   const input = document.getElementById(inputId);
   if (!zone || !input) return;
-  zone.onclick = () => input.click();
+
+  // iOS fix: create a fresh <input type="file"> on every tap so the full
+  // action sheet (Photo Library / Take Photo / Choose File) always appears.
+  zone.onclick = () => {
+    const fresh = document.createElement('input');
+    fresh.type = 'file';
+    fresh.accept = 'image/*';
+    fresh.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+    document.body.appendChild(fresh);
+    fresh.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const b64 = await readFileAsBase64(file);
+        callback(b64);
+      }
+      document.body.removeChild(fresh);
+    };
+    fresh.click();
+  };
+
   zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
   zone.ondragleave = () => zone.classList.remove('dragover');
   zone.ondrop = async (e) => {
@@ -3852,7 +3958,7 @@ function setupDropZone(zoneId, inputId, callback) {
   };
   input.onchange = async (e) => {
     const file = e.target.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file) {
       const b64 = await readFileAsBase64(file);
       callback(b64);
     }
@@ -3893,7 +3999,7 @@ function openCloseTradeModal(tradeId) {
             <div style="font-size: 28px; opacity: 0.4;">📉</div>
             <div style="margin-top: 6px; font-size: 13px;">Click or drag image to upload</div>
           </div>
-          <input type="file" id="dropInputClose" accept="image/*" style="display: none;">
+          <input type="file" id="dropInputClose" accept="image/*,application/pdf" style="display: none;">
         </div>
       </div>
       ${state.rules.length > 0 ? `
@@ -3922,7 +4028,7 @@ function openCloseTradeModal(tradeId) {
   setupDropZone('dropZoneClose', 'dropInputClose', (b64) => {
     exitChart = b64;
     const z = document.getElementById('dropZoneClose');
-    z.innerHTML = `<img class="drop-zone-preview" src="${b64}"><input type="file" id="dropInputClose" accept="image/*" style="display: none;">`;
+    z.innerHTML = `<img class="drop-zone-preview" src="${b64}"><input type="file" id="dropInputClose" accept="image/*,application/pdf" style="display: none;">`;
     setupDropZone('dropZoneClose', 'dropInputClose', (b) => { exitChart = b; });
   });
   document.getElementById('confirmCloseBtn').onclick = async () => {
@@ -4161,6 +4267,68 @@ function deletePortfolioPrompt(id) {
     showToast('Holding deleted', 'info');
     renderActivePanel();
   }, 'Delete');
+}
+
+/* ========================================================================
+   MOVE BETWEEN CORE ↔ SATELLITE
+   ======================================================================== */
+function moveCoreToSatellite(id) {
+  const p = state.portfolio.find(x => x.id === id);
+  if (!p) return;
+  showConfirm(
+    `Move ${p.symbol} to Satellite?`,
+    `This will remove <strong>${p.symbol}</strong> from your Core holdings and add it as an open Satellite trade with the same qty and avg price.`,
+    async () => {
+      state.trades.push({
+        id: generateId(),
+        portfolioType: 'satellite',
+        status: 'open',
+        category: p.category || 'stocks',
+        symbol: p.symbol,
+        tradeName: p.tradeName || '',
+        entryPrice: p.avgPrice,
+        entryQty: p.qty,
+        entryDate: p.addedAt || new Date().toISOString(),
+        entryDesc: '',
+        tags: [],
+        createdAt: new Date().toISOString()
+      });
+      state.portfolio = state.portfolio.filter(x => x.id !== id);
+      await saveState();
+      closeModal();
+      showToast(`${p.symbol} moved to Satellite`, 'success');
+      setSubTab('trades', 'satellite-open');
+    },
+    'Move to Satellite',
+    'btn-primary'
+  );
+}
+
+function moveSatelliteToCore(id) {
+  const t = state.trades.find(x => x.id === id);
+  if (!t || t.status !== 'open') return;
+  showConfirm(
+    `Move ${t.symbol} to Core?`,
+    `This will remove <strong>${t.symbol}</strong> from your Satellite trades and add it as a Core holding with the same qty and entry price.`,
+    async () => {
+      state.portfolio.push({
+        id: generateId(),
+        symbol: t.symbol,
+        tradeName: t.tradeName || '',
+        qty: t.entryQty,
+        avgPrice: t.entryPrice,
+        category: t.category || 'stocks',
+        addedAt: t.entryDate || new Date().toISOString()
+      });
+      state.trades = state.trades.filter(x => x.id !== id);
+      await saveState();
+      closeModal();
+      showToast(`${t.symbol} moved to Core`, 'success');
+      setSubTab('trades', 'core');
+    },
+    'Move to Core',
+    'btn-primary'
+  );
 }
 
 /* ========================================================================
@@ -5371,11 +5539,12 @@ function aiNoKeyBanner() {
 }
 
 const AI_FEATURES = [
-  { id: 'chat',     icon: '✨', title: 'AI Assistant',     sub: 'Chat about stocks & your journal' },
-  { id: 'business', icon: '🏢', title: 'Business Analysis', sub: 'Enter a stock → full business breakdown' },
-  { id: 'reviewer', icon: '🔍', title: 'Trade Reviewer',    sub: 'Find mistakes & rule violations' },
-  { id: 'insights', icon: '💡', title: 'AI Insights',       sub: 'Performance patterns & suggestions' },
-  { id: 'chart',    icon: '📷', title: 'Chart Reader',      sub: 'Extract setup from a chart screenshot' },
+  { id: 'chat',       icon: '✨', title: 'AI Assistant',      sub: 'Chat about stocks & your journal' },
+  { id: 'livestock',  icon: '📡', title: 'Live Stock Lookup', sub: 'Get live price, news & AI summary for any stock' },
+  { id: 'business',   icon: '🏢', title: 'Business Analysis', sub: 'Enter a stock → full business breakdown' },
+  { id: 'reviewer',   icon: '🔍', title: 'Trade Reviewer',    sub: 'Find mistakes & rule violations' },
+  { id: 'insights',   icon: '💡', title: 'AI Insights',       sub: 'Performance patterns & suggestions' },
+  { id: 'chart',      icon: '📷', title: 'Chart Reader',      sub: 'Upload chart + add prompt for AI analysis' },
 ];
 
 function renderAI() {
@@ -5387,16 +5556,30 @@ function renderAI() {
         <p class="page-subtitle">Model: ${escapeHtml(aiCurrentModelLabel())} · ${state.settings.ai.provider === 'gemini' ? 'Google Gemini' : 'OpenRouter'}</p>
       </div></div>
       ${aiNoKeyBanner()}
+      <div style="position:relative;margin-bottom:16px;">
+        <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text-subtle);" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="aiHubSearch" class="form-input" placeholder="Search AI tools…"
+          style="padding-left:36px;padding-right:36px;font-size:14px;"
+          oninput="aiHubFilter(this.value)"
+          autocomplete="off" spellcheck="false">
+        <button id="aiHubSearchClear" onclick="aiHubClearSearch()" title="Clear"
+          style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-subtle);cursor:pointer;padding:4px;line-height:1;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
       <div class="ai-hub-label">AI Tools</div>
-      ${AI_FEATURES.map(f => `
-        <button class="ai-hub-row" onclick="aiGoTo('${f.id}')">
-          <span class="ai-hub-icon">${f.icon}</span>
-          <span class="ai-hub-text">
-            <span class="ai-hub-title">${f.title}</span>
-            <span class="ai-hub-sub">${f.sub}</span>
-          </span>
-          <span class="ai-hub-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-        </button>`).join('')}
+      <div id="aiHubList">
+        ${AI_FEATURES.map(f => `
+          <button class="ai-hub-row" data-title="${f.title.toLowerCase()}" data-sub="${f.sub.toLowerCase()}" onclick="aiGoTo('${f.id}')">
+            <span class="ai-hub-icon">${f.icon}</span>
+            <span class="ai-hub-text">
+              <span class="ai-hub-title">${f.title}</span>
+              <span class="ai-hub-sub">${f.sub}</span>
+            </span>
+            <span class="ai-hub-chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+          </button>`).join('')}
+        <div id="aiHubEmpty" style="display:none;padding:24px 0;text-align:center;color:var(--text-muted);font-size:13px;">No matching tools</div>
+      </div>
     `;
     return;
   }
@@ -5409,7 +5592,12 @@ function renderAI() {
   if (aiView === 'business') { panel.innerHTML = head + aiBusinessHTML(); return; }
   if (aiView === 'reviewer') { panel.innerHTML = head + aiSimpleRunHTML('reviewer'); return; }
   if (aiView === 'insights') { panel.innerHTML = head + aiSimpleRunHTML('insights'); return; }
-  if (aiView === 'chart')    { panel.innerHTML = head + aiChartHTML(); setupDropZone('aiChartDrop', 'aiChartFile', (b64) => aiReadChart(b64)); return; }
+  if (aiView === 'livestock') { panel.innerHTML = head + aiLiveStockHTML(); aiWireLiveStock(); return; }
+  if (aiView === 'chart')    {
+    panel.innerHTML = head + aiChartHTML();
+    setupDropZone('aiChartDrop', 'aiChartFile', (b64) => aiReadChart(b64));
+    return;
+  }
 }
 
 function aiGoTo(view) {
@@ -5419,6 +5607,102 @@ function aiGoTo(view) {
       "Hi! I'm your trading assistant. Ask me to analyze a stock's business or review your trades.\n\nTry:\n• \"Analyze the business of RELIANCE\"\n• \"What's the bull vs bear case for INFY?\"\n• \"Review my open positions\"\n\nYou can also attach a chart screenshot 📷." });
   }
   renderAI();
+}
+
+function aiHubFilter(q) {
+  const term = q.trim().toLowerCase();
+  const rows = document.querySelectorAll('#aiHubList .ai-hub-row');
+  const empty = document.getElementById('aiHubEmpty');
+  const clear = document.getElementById('aiHubSearchClear');
+  if (clear) clear.style.display = term ? '' : 'none';
+  let visible = 0;
+  rows.forEach(btn => {
+    const match = !term || btn.dataset.title.includes(term) || btn.dataset.sub.includes(term);
+    btn.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  if (empty) empty.style.display = visible === 0 ? '' : 'none';
+}
+
+function aiHubClearSearch() {
+  const inp = document.getElementById('aiHubSearch');
+  if (inp) { inp.value = ''; inp.focus(); }
+  aiHubFilter('');
+}
+
+/* ----- Copy & Download helpers for AI results ----- */
+const SEND_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+
+function aiGetResultText(resultElId) {
+  const el = document.getElementById(resultElId);
+  if (!el) return '';
+  const inner = el.querySelector('.ai-result');
+  return (inner || el).textContent.trim();
+}
+
+async function aiCopyResult(resultElId) {
+  const text = aiGetResultText(resultElId);
+  if (!text) return showToast('Nothing to copy yet', 'error');
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard', 'success');
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); showToast('Copied to clipboard', 'success'); } catch (_) { showToast('Copy failed — long-press to copy manually', 'error'); }
+    document.body.removeChild(ta);
+  }
+}
+
+function aiDownloadResult(resultElId, filename) {
+  const text = aiGetResultText(resultElId);
+  if (!text) return showToast('Nothing to download yet', 'error');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename || 'ai-result.txt';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+  showToast('Downloaded', 'success');
+}
+
+function aiResultActions(resultElId, filename) {
+  return `<div class="ai-result-actions">
+    <button class="btn btn-secondary btn-sm" onclick="aiCopyResult('${resultElId}')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="aiDownloadResult('${resultElId}','${filename}')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download
+    </button>
+  </div>`;
+}
+
+function aiCopyChatLast() {
+  const msgs = aiChatMessages.filter(m => m.role === 'assistant');
+  const last = msgs.length ? msgs[msgs.length - 1].text : '';
+  if (!last) return showToast('No reply to copy yet', 'error');
+  navigator.clipboard.writeText(last).then(
+    () => showToast('Copied to clipboard', 'success'),
+    () => showToast('Copy failed', 'error')
+  );
+}
+
+function aiDownloadChatLast() {
+  const msgs = aiChatMessages.filter(m => m.role === 'assistant');
+  const last = msgs.length ? msgs[msgs.length - 1].text : '';
+  if (!last) return showToast('No reply to download yet', 'error');
+  const blob = new Blob([last], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'ai-chat-reply.txt';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+  showToast('Downloaded', 'success');
 }
 
 /* ----- Chat ----- */
@@ -5433,11 +5717,23 @@ function aiChatHTML() {
       <button class="ai-chip" onclick="aiChip('Review my open positions')">🔍 Review positions</button>
     </div>`;
   const attach = aiAttachImage ? `<div class="ai-attach-preview"><img src="${aiAttachImage}"><button onclick="aiClearAttach()">✕ remove image</button></div>` : '';
+  const hasAssistantMsg = aiChatMessages.some(m => m.role === 'assistant' && !m.text.startsWith("Hi! I'm your trading"));
+  const chatActions = hasAssistantMsg ? `<div class="ai-result-actions" style="margin-top:6px;margin-bottom:2px;">
+    <button class="btn btn-secondary btn-sm" onclick="aiCopyChatLast()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy last reply
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="aiDownloadChatLast()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download last reply
+    </button>
+  </div>` : '';
   return `
     ${aiNoKeyBanner()}
     <div class="ai-chat-wrap">
       <div class="ai-chat-msgs" id="aiChatMsgs">${msgs}${thinking}</div>
       ${chips}
+      ${chatActions}
       ${attach}
       <div class="ai-input-bar">
         <button class="ai-icon-sm" id="aiAttachBtn" title="Attach chart">
@@ -5541,6 +5837,23 @@ async function aiSendChat() {
   if (inp) { inp.disabled = false; inp.focus(); }
 }
 
+
+/* ----- Shared prompt-box builder for all AI sections ----- */
+function aiPromptBox(id, placeholder, onSend, btnLabel) {
+  return `<div style="margin-top:14px;border-top:1px solid var(--border-subtle);padding-top:12px;">
+    <label class="form-label" style="margin-bottom:4px;display:block;">Follow-up / Custom Prompt</label>
+    <div class="ai-input-bar" style="align-items:flex-end;">
+      <textarea id="${id}" rows="2" placeholder="${placeholder}"
+        style="flex:1;resize:vertical;min-height:44px;padding:8px 10px;font-size:13px;border-radius:8px;border:1px solid var(--border);background:var(--surface-3);color:var(--text);font-family:inherit;"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();${onSend};}"></textarea>
+      <button class="btn btn-sm" style="flex-shrink:0;height:44px;padding:0 14px;display:flex;align-items:center;gap:6px;" onclick="${onSend}">
+        ${SEND_SVG} ${btnLabel || 'Send'}
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text-subtle);margin-top:4px;">Shift+Enter for newline · Enter to send</div>
+  </div>`;
+}
+
 /* ----- Business Analysis (fixed prompt, user supplies symbol) ----- */
 function aiBusinessHTML() {
   const custom = (state.settings.ai.businessPrompt || '').trim();
@@ -5554,7 +5867,9 @@ function aiBusinessHTML() {
       </button>
     </div>
     <button class="btn btn-ghost btn-sm" style="margin-bottom:8px" onclick="editBusinessPromptModal()">✎ Edit default prompt${custom ? ' (custom)' : ''}</button>
-    <div id="aiBizResult"></div>`;
+    <div id="aiBizResult"></div>
+    ${aiResultActions('aiBizResult', 'business-analysis.txt')}
+    ${aiPromptBox('aiBizFollowUp', 'Ask a follow-up e.g. "What are the key risks?" or override the analysis prompt…', 'aiBusinessFollowUp()', 'Ask')}`;
 }
 
 function editBusinessPromptModal() {
@@ -5616,11 +5931,16 @@ function aiSimpleRunHTML(kind) {
   const desc = kind === 'reviewer'
     ? 'Analyzes your closed trades for recurring mistakes, rule violations, position-sizing issues and emotional patterns.'
     : 'Summarizes your performance: best/worst setups, win-rate by category & tag, rule adherence, and concrete suggestions.';
+  const placeholder = kind === 'reviewer'
+    ? 'Ask a specific question e.g. "Which setups lose me the most?" or "Focus on my FOMO trades"'
+    : 'Ask e.g. "What is my best performing tag?" or "Compare my last 10 vs previous 10 trades"';
   return `
     ${aiNoKeyBanner()}
     <p class="section-panel-desc" style="margin-top:0">${desc}</p>
     <div class="btn-row"><button class="btn" onclick="aiRunJournal('${kind}')">${kind === 'reviewer' ? 'Review my trades' : 'Generate insights'}</button></div>
-    <div id="aiRunResult"></div>`;
+    <div id="aiRunResult"></div>
+    ${aiResultActions('aiRunResult', kind === 'reviewer' ? 'trade-review.txt' : 'ai-insights.txt')}
+    ${aiPromptBox('aiRunFollowUp', placeholder, 'aiJournalFollowUp(\''+kind+'\')', 'Ask')}`;
 }
 function aiBuildJournalSummary() {
   const closed = [
@@ -5658,36 +5978,196 @@ async function aiRunJournal(kind) {
   aiBusy = false;
 }
 
+/* ----- Live Stock Lookup ----- */
+function aiLiveStockHTML() {
+  return `
+    ${aiNoKeyBanner()}
+    <p class="section-panel-desc" style="margin-top:0">Enter any stock symbol or company name. AI uses web search to get the latest price, news, and a quick summary — all in one shot.</p>
+    <div class="ai-input-bar" style="margin-bottom:6px;">
+      <input type="text" id="aiLiveInput" placeholder="e.g. RELIANCE, INFY, TCS, NIFTY 50" style="font-size:14px;"
+        onkeydown="if(event.key==='Enter') aiLiveStockLookup()">
+      <button class="ai-icon-sm ai-send-btn" onclick="aiLiveStockLookup()" title="Look up">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;" id="aiLiveChips">
+      ${(state.portfolio.map(p=>p.symbol).concat(state.trades.filter(t=>t.status==='open').map(t=>t.symbol))).slice(0,6).map(s =>
+        `<button class="ai-chip" style="font-size:12px;padding:4px 10px;" onclick="document.getElementById('aiLiveInput').value='${s}';aiLiveStockLookup()">${s}</button>`
+      ).join('')}
+    </div>
+    <div id="aiLiveResult"></div>
+    ${aiResultActions('aiLiveResult', 'stock-lookup.txt')}
+    ${aiPromptBox('aiLiveFollowUp', 'Ask more e.g. "Compare with its sector" or "What\'s the next earnings date?"', 'aiLiveFollowUp()', 'Ask')}`;
+}
+function aiWireLiveStock() {
+  const input = document.getElementById('aiLiveInput');
+  if (input) input.focus();
+}
+async function aiLiveStockLookup() {
+  if (aiBusy) return;
+  const input = document.getElementById('aiLiveInput');
+  const symbol = (input ? input.value : '').trim();
+  if (!symbol) return showToast('Enter a stock symbol or name', 'error');
+  if (!aiHasKey()) return showToast('Add an API key in Settings first', 'error');
+  const out = document.getElementById('aiLiveResult');
+  aiBusy = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Searching for ${escapeHtml(symbol)}…</div>`;
+  const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+  const system = "You are a financial data assistant for Indian equity markets. Use your knowledge of current market data up to your training cutoff, and clearly state the date of your information. Format your response with clear sections using plain text and short headings. Be factual and note any uncertainty about real-time data.";
+  const prompt = `Today's date is ${today}. Give me a comprehensive live update for: ${symbol}
+
+Please provide:
+
+CURRENT PRICE & PERFORMANCE
+- Latest known price (₹) and approximate change (% and ₹) from previous close
+- 52-week high and low
+- Market cap category (Large/Mid/Small cap)
+
+TODAY'S MARKET UPDATE
+- Any significant price movement today and likely reason
+- Volume trend (high/low/normal)
+- Sector performance context
+
+RECENT NEWS (last 7-14 days)
+- Top 2-3 news items affecting this stock
+- Any earnings, management changes, regulatory updates, or major contracts
+
+TECHNICAL SNAPSHOT
+- Current trend (uptrend / downtrend / sideways)
+- Key support and resistance levels
+- RSI / momentum signal if notable
+
+FUNDAMENTAL SNAPSHOT
+- P/E ratio vs sector average
+- Revenue / profit trend (last 2 quarters)
+- Promoter holding % and any recent changes
+
+AI VERDICT
+- Short-term outlook (1-4 weeks): Bullish / Bearish / Neutral with 1-line reason
+- Key risk to watch
+
+Note: Clearly state your data cutoff date. This is not financial advice.`;
+  try {
+    const reply = await callAI(system, [{ role: 'user', text: prompt }]);
+    out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+}
+
 /* ----- Chart Reader (vision) ----- */
 function aiChartHTML() {
   const isGemini = state.settings.ai.provider === 'gemini';
   return `
     ${aiNoKeyBanner()}
     ${!isGemini ? `<div class="ai-nokey">ℹ️ Chart reading works best with Google Gemini. Your current provider is OpenRouter — switch in Settings if the model doesn't support images.</div>` : ''}
-    <p class="section-panel-desc" style="margin-top:0">Upload a chart screenshot. The AI identifies the symbol (if visible), the pattern, and a suggested entry / stop-loss / target.</p>
+    <p class="section-panel-desc" style="margin-top:0">Upload a chart screenshot and optionally add a custom prompt. AI identifies the symbol, trend, pattern and suggests entry / SL / target.</p>
     <div class="drop-zone" id="aiChartDrop">
       <div><div style="font-size:28px;opacity:0.4;">📈</div><div style="margin-top:6px;font-size:13px;">Click or drag a chart image</div></div>
       <input type="file" id="aiChartFile" accept="image/*" style="display:none">
     </div>
-    <div id="aiChartResult"></div>`;
+    <div id="aiChartResult" style="margin-top:10px;"></div>
+    ${aiResultActions('aiChartResult', 'chart-analysis.txt')}
+    ${aiPromptBox('aiChartPrompt', "e.g. Is this a breakout or fakeout? What's the target? Analyse volume…", 'aiChartSendPrompt()', 'Analyse')}`;
 }
 async function aiReadChart(dataUrl) {
   const out = document.getElementById('aiChartResult');
   const drop = document.getElementById('aiChartDrop');
-  if (drop) drop.innerHTML = `<img class="drop-zone-preview" src="${dataUrl}">`;
+  if (drop) drop.innerHTML = `<img class="drop-zone-preview" src="${dataUrl}"><input type="file" id="aiChartFile" accept="image/*" style="display:none">`;
+  // Re-wire drop zone after re-render
+  setupDropZone('aiChartDrop', 'aiChartFile', (b64) => aiReadChart(b64));
   if (!aiHasKey()) { out.innerHTML = `<div class="ai-nokey">Add an API key in Settings first.</div>`; return; }
+  if (aiBusy) return;
   aiBusy = true;
   out.innerHTML = `<div class="ai-result ai-bubble thinking">Reading the chart…</div>`;
-  const system = "You are a technical analyst. Read trading chart screenshots and respond in plain text with short headings.";
-  const prompt = `Look at this trading chart and report:
+  const system = "You are a technical analyst specialising in Indian equity markets. Read trading chart screenshots and respond in plain text with short headings. Be concise and actionable.";
+  const customPrompt = (document.getElementById('aiChartPrompt') || {}).value || '';
+  const defaultPrompt = `Analyse this trading chart and report:
 1. Symbol & timeframe (if visible)
-2. Trend & key support/resistance
-3. Chart pattern / setup you see
-4. A possible trade idea: entry, stop-loss, target, and rough risk:reward
-Note this is not financial advice.`;
+2. Current trend & key support / resistance levels
+3. Chart pattern or setup you can identify
+4. Suggested trade idea: entry zone, stop-loss, target, and risk:reward ratio
+5. Any candle patterns or volume signals worth noting
+Note: This is not financial advice.`;
+  const prompt = customPrompt.trim() ? `${customPrompt.trim()}\n\nAlso provide: entry, SL, target and risk:reward if a trade setup is visible.` : defaultPrompt;
   try {
     const reply = await callAI(system, [{ role: 'user', text: prompt, image: dataUrl }]);
     out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+}
+
+/* ----- Follow-up prompt handlers for all AI sections ----- */
+function aiChartSendPrompt() {
+  const img = document.querySelector('#aiChartDrop img');
+  if (!img) return showToast('Upload a chart image first', 'error');
+  aiReadChart(img.src);
+}
+
+async function aiBusinessFollowUp() {
+  if (aiBusy) return;
+  const ta = document.getElementById('aiBizFollowUp');
+  const question = ta ? ta.value.trim() : '';
+  if (!question) return showToast('Enter a follow-up question', 'error');
+  if (!aiHasKey()) return showToast('Add an API key in Settings first', 'error');
+  const symbol = (document.getElementById('aiBizInput') || {}).value || 'the stock';
+  const out = document.getElementById('aiBizResult');
+  aiBusy = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Thinking…</div>`;
+  const system = "You are an equity research analyst covering Indian markets. Answer concisely with plain text and short headings.";
+  const prompt = `Regarding ${symbol.trim() || 'the stock discussed'}: ${question}`;
+  try {
+    const reply = await callAI(system, [{ role: 'user', text: prompt }]);
+    out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+    if (ta) ta.value = '';
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+}
+
+async function aiJournalFollowUp(kind) {
+  if (aiBusy) return;
+  const ta = document.getElementById('aiRunFollowUp');
+  const question = ta ? ta.value.trim() : '';
+  if (!question) return showToast('Enter a question about your trades', 'error');
+  if (!aiHasKey()) return showToast('Add an API key in Settings first', 'error');
+  const out = document.getElementById('aiRunResult');
+  const summary = aiBuildJournalSummary();
+  if (!summary) { out.innerHTML = `<div class="ai-nokey">No closed trades yet to analyze.</div>`; return; }
+  aiBusy = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Analyzing…</div>`;
+  const system = "You are a trading coach reviewing a trader's journal. Be specific, reference the data, and give actionable feedback. Plain text with short headings.";
+  const prompt = `${question}\n\nJournal data:\n${summary}`;
+  try {
+    const reply = await callAI(system, [{ role: 'user', text: prompt }]);
+    out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+    if (ta) ta.value = '';
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+}
+
+async function aiLiveFollowUp() {
+  if (aiBusy) return;
+  const ta = document.getElementById('aiLiveFollowUp');
+  const question = ta ? ta.value.trim() : '';
+  if (!question) return showToast('Enter a follow-up question', 'error');
+  if (!aiHasKey()) return showToast('Add an API key in Settings first', 'error');
+  const symbol = (document.getElementById('aiLiveInput') || {}).value || 'the stock';
+  const out = document.getElementById('aiLiveResult');
+  aiBusy = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Thinking…</div>`;
+  const system = "You are a financial data assistant for Indian equity markets. Be concise, factual and use plain text with short headings.";
+  const prompt = `Regarding ${symbol.trim() || 'the stock discussed'}: ${question}`;
+  try {
+    const reply = await callAI(system, [{ role: 'user', text: prompt }]);
+    out.innerHTML = `<div class="ai-result">${escapeHtml(reply)}</div>`;
+    if (ta) ta.value = '';
   } catch (err) {
     out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
   }
@@ -5943,13 +6423,6 @@ function renderSettings() {
 /* ========================================================================
    THEME & FONT
    ======================================================================== */
-const NT_THEMES = {
-  light: { cls: 'light', bg: '#f1f5f9', label: 'Light', sw: '#f1f5f9', ring: '#0f172a' },
-  sepia: { cls: 'sepia', bg: '#f4ecd8', label: 'Sepia', sw: '#f4ecd8', ring: '#3b3225' },
-  dark:  { cls: '',      bg: '#0f172a', label: 'Dark',  sw: '#0f172a', ring: '#e2e8f0' },
-  black: { cls: 'black', bg: '#000000', label: 'Black', sw: '#000000', ring: '#9a9aa4' }
-};
-const NT_THEME_ORDER = ['light', 'sepia', 'dark', 'black'];
 function applyTheme(theme) {
   const key = NT_THEMES[theme || state.settings.theme] ? (theme || state.settings.theme) : 'dark';
   const root = document.documentElement;
@@ -6401,7 +6874,20 @@ async function importZerodhaTradebook(event) {
     if (!symbols.length) return showToast('No buy trades found in this file', 'error');
 
     symbols.forEach(g => {
-      g.avgBuy = g.buyValue / g.buyQty;
+      // Aggregate individual rows into buy/sell totals (was missing — caused NaN/undefined)
+      g.buyQty = 0; g.buyValue = 0; g.sellQty = 0; g.sellValue = 0;
+      g.firstBuyDate = null; g.lastSellDate = null;
+      g.rows.forEach(r => {
+        if (r.type === 'BUY')  {
+          g.buyQty  += r.qty; g.buyValue  += r.qty * r.price;
+          if (!g.firstBuyDate || r.date < g.firstBuyDate) g.firstBuyDate = r.date;
+        }
+        if (r.type === 'SELL') {
+          g.sellQty += r.qty; g.sellValue += r.qty * r.price;
+          if (!g.lastSellDate || r.date > g.lastSellDate) g.lastSellDate = r.date;
+        }
+      });
+      g.avgBuy = g.buyQty > 0 ? g.buyValue / g.buyQty : 0;
       // Clamp matched sell qty to what was actually bought (handles net-short edge case)
       g.netSellQty = Math.min(g.sellQty, g.buyQty);
       g.openQty = g.buyQty - g.netSellQty;
@@ -6426,39 +6912,59 @@ async function importZerodhaTradebook(event) {
       size: 'lg',
       body: `
         ${dupCount > 0 ? `<p style="color:var(--warning,#f59e0b);font-size:13px;margin:0 0 10px;padding:8px 10px;background:rgba(245,158,11,.1);border-radius:6px;">⚠️ ${dupCount} symbol${dupCount > 1 ? 's' : ''} already exist in your portfolio/trades and are set to <strong>Skip</strong> by default. Choose <em>Update existing</em> to merge tradebook data into the existing entry instead of creating a duplicate.</p>` : ''}
-        <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 12px;">Review and choose where each symbol goes. Partial closes create both a core/open entry and a separate closed P&amp;L record.</p>
-        <div class="table-wrap">
-          <table class="data-table" id="zerodhaTable">
-            <thead>
-              <tr><th>Symbol</th><th>Buy Qty</th><th>Avg Buy</th><th>Sell Qty</th><th>Avg Sell</th><th>Open Qty</th><th>Realized P&amp;L</th><th>Status</th><th>Assign To</th></tr>
-            </thead>
-            <tbody>
-              ${symbols.map((g, i) => {
-                const pnlColor = g.realizedPnl === null ? '' : g.realizedPnl >= 0 ? 'color:var(--success,#22c55e)' : 'color:var(--danger,#ef4444)';
-                const rowStyle = g.isDuplicate ? 'opacity:0.7' : '';
-                const dupBadge = g.isDuplicate ? ' <span class="badge" style="background:var(--warning,#f59e0b);color:#000;font-size:10px;vertical-align:middle;">exists</span>' : '';
-                return `
-                <tr style="${rowStyle}">
-                  <td>${escapeHtml(g.symbol)}${dupBadge}</td>
-                  <td>${g.buyQty}</td>
-                  <td>${formatINR(g.avgBuy)}</td>
-                  <td>${g.netSellQty > 0 ? g.netSellQty : '—'}</td>
-                  <td>${g.avgSell > 0 ? formatINR(g.avgSell) : '—'}</td>
-                  <td>${g.openQty}</td>
-                  <td style="${pnlColor}">${g.realizedPnl !== null ? formatINR(g.realizedPnl) : '—'}</td>
-                  <td><span class="badge ${g.status === 'open' ? 'warning' : 'success'}">${g.hasPartialClose ? 'partial' : g.status}</span></td>
-                  <td>
-                    <select class="form-select" data-idx="${i}" style="padding: 4px 8px; font-size: 12px;">
-                      <option value="core" ${g.assignTo === 'core' ? 'selected' : ''}>Core (new)</option>
-                      <option value="satellite" ${g.assignTo === 'satellite' ? 'selected' : ''}>Satellite (new)</option>
-                      ${g.isDuplicate ? `<option value="update" ${g.assignTo === 'update' ? 'selected' : ''}>Update existing</option>` : ''}
-                      <option value="skip" ${g.assignTo === 'skip' ? 'selected' : ''}>Skip</option>
-                    </select>
-                  </td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
+        <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 12px;">Check the entries you want to import and choose where each goes.</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none;">
+            <input type="checkbox" id="zerodhaSelectAll" checked style="width:16px;height:16px;cursor:pointer;" onchange="
+              document.querySelectorAll('.z-row-cb').forEach(cb => {
+                cb.checked = this.checked;
+                const card = cb.closest('.z-import-card');
+                card.style.opacity = this.checked ? '1' : '0.45';
+                card.querySelector('.z-assign-sel').disabled = !this.checked;
+              });
+            "> Select All
+          </label>
+        </div>
+        <div id="zerodhaTable" style="display:flex;flex-direction:column;gap:10px;">
+          ${symbols.map((g, i) => {
+            const pnlColor = g.realizedPnl === null ? '' : g.realizedPnl >= 0 ? 'color:var(--success,#22c55e)' : 'color:var(--danger,#ef4444)';
+            const isChecked = g.assignTo !== 'skip';
+            const dupBadge = g.isDuplicate ? `<span class="badge" style="background:var(--warning,#f59e0b);color:#000;font-size:10px;">exists</span>` : '';
+            const statusBadge = `<span class="badge ${g.status === 'open' ? 'warning' : 'success'}">${g.hasPartialClose ? 'partial' : g.status}</span>`;
+            return `
+            <div class="z-import-card" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--surface-3);opacity:${isChecked ? '1' : '0.45'};">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <input type="checkbox" class="z-row-cb" data-idx="${i}" ${isChecked ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0;cursor:pointer;" onchange="
+                  const card = this.closest('.z-import-card');
+                  card.style.opacity = this.checked ? '1' : '0.45';
+                  card.querySelector('.z-assign-sel').disabled = !this.checked;
+                  const allCbs = document.querySelectorAll('.z-row-cb');
+                  document.getElementById('zerodhaSelectAll').checked = [...allCbs].every(c => c.checked);
+                ">
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span style="font-weight:700;font-size:15px;font-family:var(--font-mono,monospace);">${escapeHtml(g.symbol)}</span>
+                    ${dupBadge} ${statusBadge}
+                  </div>
+                </div>
+                <select class="form-select z-assign-sel" data-idx="${i}" ${!isChecked ? 'disabled' : ''} style="padding:4px 8px;font-size:12px;max-width:140px;">
+                  <option value="core" ${g.assignTo === 'core' ? 'selected' : ''}>Core (new)</option>
+                  <option value="satellite" ${g.assignTo === 'satellite' ? 'selected' : ''}>Satellite (new)</option>
+                  ${g.isDuplicate ? `<option value="update" ${g.assignTo === 'update' ? 'selected' : ''}>Update existing</option>` : ''}
+                </select>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px 12px;">
+                <div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.05em;">Buy Qty</div><div style="font-size:13px;font-weight:600;">${g.buyQty}</div></div>
+                <div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.05em;">Avg Buy</div><div style="font-size:13px;font-weight:600;">${formatINR(g.avgBuy)}</div></div>
+                <div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.05em;">Open Qty</div><div style="font-size:13px;font-weight:600;">${g.openQty}</div></div>
+                ${g.netSellQty > 0 ? `
+                <div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.05em;">Sell Qty</div><div style="font-size:13px;">${g.netSellQty}</div></div>
+                <div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.05em;">Avg Sell</div><div style="font-size:13px;">${formatINR(g.avgSell)}</div></div>
+                <div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.05em;">Realized P&amp;L</div><div style="font-size:13px;font-weight:600;${pnlColor}">${g.realizedPnl !== null ? formatPnl(g.realizedPnl) : '—'}</div></div>
+                ` : ''}
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       `,
       footer: `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn" id="confirmZerodhaBtn">Import Selected</button>`
@@ -6480,24 +6986,25 @@ async function importZerodhaTradebook(event) {
           tradeName: 'Imported from Zerodha',
           entryPrice: g.avgBuy,
           entryQty: g.netSellQty,
-          entryDate: now,
+          entryDate: g.firstBuyDate ? new Date(g.firstBuyDate).toISOString() : now,
           entryDesc: 'Auto-imported from Zerodha tradebook',
           exitPrice: g.avgSell,
           exitQty: g.netSellQty,
-          exitDate: now,
+          exitDate: g.lastSellDate ? new Date(g.lastSellDate).toISOString() : now,
           realizedPnl: g.realizedPnl,
           commission: estimateCommission(g.netSellQty * (g.avgBuy + g.avgSell)),
-          closedAt: now,
+          closedAt: g.lastSellDate ? new Date(g.lastSellDate).toISOString() : now,
           tags: ['zerodha-import'],
           createdAt: now
         });
       };
 
-      document.querySelectorAll('#zerodhaTable select').forEach(sel => {
-        const idx = parseInt(sel.dataset.idx);
-        const choice = sel.value;
+      document.querySelectorAll('#zerodhaTable .z-row-cb').forEach(cb => {
+        if (!cb.checked) return;   // unchecked = skip
+        const idx = parseInt(cb.dataset.idx);
+        const sel = document.querySelector(`.z-assign-sel[data-idx="${idx}"]`);
+        const choice = sel ? sel.value : 'satellite';
         const g = symbols[idx];
-        if (choice === 'skip') return;
 
         if (choice === 'update') {
           // Merge tradebook data into the existing portfolio or open trade entry
@@ -6525,7 +7032,7 @@ async function importZerodhaTradebook(event) {
             tradeName: 'Imported from Zerodha',
             qty: g.openQty || g.buyQty,
             avgPrice: g.avgBuy,
-            addedAt: now
+            addedAt: g.firstBuyDate ? new Date(g.firstBuyDate).toISOString() : now
           });
           // If shares were also sold, record that realized P&L as a closed satellite trade
           if (g.hasPartialClose) pushClosedTrade(g);
