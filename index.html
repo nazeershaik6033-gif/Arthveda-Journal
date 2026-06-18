@@ -1860,9 +1860,34 @@ table.data-table tr:last-child td { border-bottom: none; }
   <nav class="drawer-nav" id="drawerNav"></nav>
 </aside>
 
+<style>
+/* Homepage collapsible sections */
+.home-sec { margin-top: 14px; padding: 0; overflow: hidden; }
+.home-sec:first-child { margin-top: 0; }
+.home-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; cursor: pointer; user-select: none; }
+.home-sec-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.home-sec-chevron { display: inline-block; transition: transform .18s ease; color: var(--text-muted); font-size: 12px; }
+.home-sec-chevron.open { transform: rotate(90deg); }
+.home-sec-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.home-sec-body { padding: 0 16px 16px; }
+/* Current Holdings summary + sub-sections */
+.holdings-summary { display: flex; gap: 18px; padding: 4px 0 12px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px; }
+.hs-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.hs-val { font-size: 13px; font-weight: 600; }
+.holdings-subhead { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 14px 0 8px; display: flex; align-items: center; gap: 6px; }
+.holdings-subhead .hs-count { background: var(--border-subtle); color: var(--text-muted); border-radius: 10px; padding: 0 7px; font-size: 10px; }
+.holdings-empty { color: var(--text-muted); font-size: 12px; padding: 6px 0 10px; }
+/* Equity curve */
+.ec-wrap { margin-top: 6px; }
+.ec-svg { width: 100%; height: 120px; display: block; }
+.ec-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+.ec-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 24px 0; }
+</style>
+
 <!-- MAIN -->
 <main class="container" id="mainContainer">
   <div class="tab-panel" id="panel-dashboard"></div>
+  <div class="tab-panel" id="panel-stats"></div>
   <div class="tab-panel" id="panel-trades"></div>
   <div class="tab-panel" id="panel-journal"></div>
   <div class="tab-panel" id="panel-entry"></div>
@@ -1898,10 +1923,11 @@ table.data-table tr:last-child td { border-bottom: none; }
 // ---- TABS CONFIG ----
 // group: 'dock' = bottom nav, 'menu' = sidebar drawer, 'fab' = floating + button
 const TABS = [
-  { id: 'dashboard', label: 'Dashboard',  icon: 'home', group: 'dock' },
+  { id: 'dashboard', label: 'Home',       icon: 'home', group: 'dock' },
   { id: 'trades',    label: 'Trades',     icon: 'list', group: 'dock' },
-  { id: 'journal',   label: 'My Journal', icon: 'book', group: 'dock' },
+  { id: 'stats',     label: 'Stats',      icon: 'bar',  group: 'dock' },
   { id: 'priority',  label: 'Setups',     icon: 'star', group: 'dock' },
+  { id: 'journal',   label: 'Journal',    icon: 'book', group: 'dock' },
   { id: 'entry',     label: 'New Trade',  icon: 'plus', group: 'fab' },
   { id: 'analytics', label: 'Analytics',  icon: 'bar',  group: 'menu' },
   { id: 'watchlist', label: 'Watchlist',  icon: 'eye',  group: 'menu' },
@@ -2501,6 +2527,7 @@ function openWatchlistFromMenu(wlId) {
 function renderActivePanel() {
   switch (activeTab) {
     case 'dashboard': renderDashboard(); break;
+    case 'stats':     renderStats(); break;
     case 'trades':    renderTrades(); break;
     case 'journal':   renderJournal(); break;
     case 'entry':     renderEntry(); break;
@@ -2680,24 +2707,30 @@ async function fetchLivePrices(symbols) {
   }
 }
 
-async function refreshAllPrices() {
+async function refreshAllPrices(opts) {
+  const silent = !!(opts && opts.silent);
   const symbols = new Set();
   state.portfolio.forEach(p => symbols.add(p.symbol));
   state.trades.filter(t => t.status === 'open').forEach(t => symbols.add(t.symbol));
   state.watchlists.forEach(w => w.symbols.forEach(s => symbols.add(s.symbol)));
   if (!symbols.size) {
-    showToast('No symbols to refresh', 'info');
+    if (!silent) showToast('No symbols to refresh', 'info');
     return;
   }
-  showToast('Fetching prices...', 'info', 1500);
+  if (!silent) showToast('Fetching prices...', 'info', 1500);
   const prices = await fetchLivePrices([...symbols]);
   window.livePrices = { ...window.livePrices, ...prices };
   window.lastPriceFetch = new Date();
-  checkGttAlerts();
-  renderActivePanel();
+  const gttChanged = checkGttAlerts();
+  // Butter-smooth: patch the live numbers in place instead of re-rendering the
+  // whole panel (no flicker, no scroll jump). Only a GTT trigger forces a render.
+  updateLiveDOM();
+  if (gttChanged) renderActivePanel();
   const count = Object.keys(prices).length;
-  if (count > 0) showToast(`Updated ${count} price${count === 1 ? '' : 's'}`, 'success');
-  else showToast('Could not fetch prices (CORS/network)', 'warning');
+  if (!silent) {
+    if (count > 0) showToast(`Updated ${count} price${count === 1 ? '' : 's'}`, 'success');
+    else showToast('Could not fetch prices (CORS/network)', 'warning');
+  }
 }
 
 function checkGttAlerts() {
@@ -2721,13 +2754,14 @@ function checkGttAlerts() {
     });
   });
   if (changed) saveState();
+  return changed;
 }
 
 function setupAutoRefresh() {
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
   if (state.settings.autoRefresh) {
     const ms = (state.settings.refreshInterval || 5) * 60 * 1000;
-    refreshTimer = setInterval(refreshAllPrices, ms);
+    refreshTimer = setInterval(() => refreshAllPrices({ silent: true }), ms);
   }
 }
 
@@ -2909,7 +2943,208 @@ function renderCurrentHoldings() {
     </div>`;
 }
 
+/* ========================================================================
+   HOMEPAGE — collapsible sections: Current Holdings / Priority / Watchlist
+   ======================================================================== */
+function loadHomeSections() {
+  try { return JSON.parse(localStorage.getItem('naz_home_sections_v1')) || {}; }
+  catch (e) { return {}; }
+}
+function saveHomeSections(s) {
+  try { localStorage.setItem('naz_home_sections_v1', JSON.stringify(s)); } catch (e) {}
+}
+// A collapsible homepage card. Sections default to open; state persists.
+function homeSection(key, title, bodyHTML, actionsHTML, isOpen) {
+  const open = isOpen !== false;
+  return `
+    <div class="home-sec card" data-sec="${key}">
+      <div class="home-sec-head" onclick="toggleHomeSection('${key}')">
+        <div class="home-sec-title">
+          <span class="home-sec-chevron ${open ? 'open' : ''}">▸</span>
+          <h3 class="card-title" style="margin:0;">${title}</h3>
+        </div>
+        <div class="home-sec-actions">${actionsHTML || ''}</div>
+      </div>
+      <div class="home-sec-body" id="home-body-${key}" style="${open ? '' : 'display:none;'}">${bodyHTML}</div>
+    </div>`;
+}
+// Toggle in place (no full re-render) so collapsing stays butter-smooth.
+function toggleHomeSection(key) {
+  const sec = loadHomeSections();
+  const cur = sec[key] !== false;
+  sec[key] = !cur;
+  saveHomeSections(sec);
+  const body = document.getElementById('home-body-' + key);
+  const chev = document.querySelector(`.home-sec[data-sec="${key}"] .home-sec-chevron`);
+  if (body) body.style.display = sec[key] ? '' : 'none';
+  if (chev) chev.classList.toggle('open', sec[key]);
+}
+
 function renderDashboard() {
+  const sec = loadHomeSections();
+  document.getElementById('panel-dashboard').innerHTML = `
+    ${homeSection('holdings', 'Current Holdings', currentHoldingsHTML(),
+      `<button class="btn btn-sm" onclick="event.stopPropagation(); switchTab('entry')">+ Add</button>`, sec.holdings)}
+    ${homeSection('priority', 'Priority Setups', priorityBodyHTML(),
+      `<button class="btn btn-sm" onclick="event.stopPropagation(); openPriorityModal()">+ Add Setup</button>`, sec.priority)}
+    ${homeSection('watchlist', 'Watchlist', watchlistBodyHTML('wlCardsHome'),
+      `<button class="btn btn-sm" onclick="event.stopPropagation(); addWatchlistSymbolPrompt()">+ Add Symbol</button>`, sec.watchlist)}
+  `;
+  initWatchlistDrag('wlCardsHome');
+}
+
+// Unrealized totals across open satellite trades + core holdings.
+function holdingsTotals() {
+  let invested = 0, current = 0;
+  (state.portfolio || []).forEach(p => {
+    const live = window.livePrices[p.symbol];
+    const inv = Number(p.qty) * Number(p.avgPrice);
+    invested += inv; current += live ? Number(p.qty) * live.price : inv;
+  });
+  (state.trades || []).filter(t => t.status === 'open').forEach(t => {
+    const live = window.livePrices[t.symbol];
+    const inv = Number(t.entryQty) * Number(t.entryPrice);
+    invested += inv; current += live ? Number(t.entryQty) * live.price : inv;
+  });
+  const pnl = current - invested;
+  const pct = invested ? (pnl / invested) * 100 : 0;
+  return { invested, current, pnl, pct };
+}
+function holdingsSummaryHTML() {
+  const t = holdingsTotals();
+  return `<div class="holdings-summary">
+    <div><div class="hs-label">Invested</div><div class="mono hs-val">${formatINR(t.invested)}</div></div>
+    <div><div class="hs-label">Unrealized P&amp;L</div><div class="mono hs-val ${pnlClass(t.pnl)}" id="homeHoldingsPnl">${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span></div></div>
+  </div>`;
+}
+function updateHoldingsSummary() {
+  const el = document.getElementById('homeHoldingsPnl');
+  if (!el) return;
+  const t = holdingsTotals();
+  el.innerHTML = `${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span>`;
+  setPnlClass(el, t.pnl);
+}
+
+// Current Holdings: two sub-sections (Satellite-open, Core) in the trade-card style.
+function currentHoldingsHTML() {
+  const openTrades = (state.trades || []).filter(t => t.status === 'open');
+  const coreItems = state.portfolio || [];
+  if (!openTrades.length && !coreItems.length) {
+    return `<div class="empty-state" style="padding:20px 0;">
+      <div class="empty-state-icon">💼</div>
+      <div class="empty-state-title">No current holdings</div>
+      <div class="empty-state-desc">Open a satellite trade or add a core holding to see it here.</div>
+      <button class="btn" onclick="switchTab('entry')">+ Add Trade</button>
+    </div>`;
+  }
+  let html = holdingsSummaryHTML();
+  html += `<div class="holdings-subhead">Satellite — Open <span class="hs-count">${openTrades.length}</span></div>`;
+  html += openTrades.length ? openTrades.map(t => renderTradeCard(t)).join('')
+    : `<div class="holdings-empty">No open satellite trades</div>`;
+  html += `<div class="holdings-subhead">Core Holdings <span class="hs-count">${coreItems.length}</span></div>`;
+  html += coreItems.length ? coreItems.map(p => coreHoldingCard(p)).join('')
+    : `<div class="holdings-empty">No core holdings</div>`;
+  return html;
+}
+// Core holding rendered as a trade-card, matching the Satellite-open style.
+function coreHoldingCard(p) {
+  const live = window.livePrices[p.symbol];
+  const invested = Number(p.qty) * Number(p.avgPrice);
+  const current = live ? Number(p.qty) * live.price : invested;
+  const pnl = current - invested;
+  const pct = invested ? (pnl / invested) * 100 : 0;
+  const sym = escapeHtml(p.symbol);
+  return `
+    <div class="trade-card" data-sym="${sym}">
+      <div class="trade-header">
+        <div>
+          <div class="trade-symbol-row"><div class="trade-symbol">${sym}</div>${tvBtn(p.symbol)}</div>
+          ${p.tradeName ? `<div class="trade-name">${escapeHtml(p.tradeName)}</div>` : ''}
+        </div>
+        <div class="trade-badges">
+          <span class="badge primary">CORE</span>
+          <span class="badge ${pnl >= 0 ? 'success' : 'error'}" data-live="corebadge" data-sym="${sym}" data-qty="${p.qty}" data-avg="${p.avgPrice}">${formatPnl(pnl)} (${pct.toFixed(2)}%)</span>
+        </div>
+      </div>
+      <div class="trade-grid">
+        <div class="trade-field"><span class="trade-field-label">Qty</span><span class="trade-field-value">${escapeHtml(String(p.qty))}</span></div>
+        <div class="trade-field"><span class="trade-field-label">Avg Buy</span><span class="trade-field-value">${formatINR(p.avgPrice)}</span></div>
+        <div class="trade-field"><span class="trade-field-label">Live Price</span><span class="trade-field-value" data-live="price" data-sym="${sym}">${live ? formatINR(live.price) : '—'}</span></div>
+        <div class="trade-field"><span class="trade-field-label">Invested</span><span class="trade-field-value">${formatINR(invested)}</span></div>
+        <div class="trade-field"><span class="trade-field-label">Current</span><span class="trade-field-value" data-live="corecur" data-sym="${sym}" data-qty="${p.qty}">${formatINR(current)}</span></div>
+      </div>
+      <div class="trade-actions">
+        <button class="btn btn-success btn-sm" onclick="openCloseCoreModal('${p.id}')">Sell / Close</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEditPortfolioModal('${p.id}')">Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="moveCoreToSatellite('${p.id}')">→ Satellite</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePortfolioPrompt('${p.id}')">Delete</button>
+      </div>
+    </div>`;
+}
+
+// Cumulative realized-P&L line chart for the Stats tab.
+function equityCurveSVG() {
+  const closed = [...allClosedTrades()].sort((a, b) => new Date(a.closedAt || 0) - new Date(b.closedAt || 0));
+  if (closed.length < 2) return `<div class="ec-empty">Close at least 2 trades to see your equity curve.</div>`;
+  let cum = 0;
+  const pts = closed.map(t => (cum += netPnl(t)));
+  const min = Math.min(0, ...pts), max = Math.max(0, ...pts);
+  const W = 320, H = 120, pad = 6, n = pts.length;
+  const span = (max - min) || 1;
+  const x = i => pad + (i / (n - 1)) * (W - 2 * pad);
+  const y = v => H - pad - ((v - min) / span) * (H - 2 * pad);
+  const line = pts.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(n - 1).toFixed(1)},${(H - pad).toFixed(1)} L${x(0).toFixed(1)},${(H - pad).toFixed(1)} Z`;
+  const col = pts[n - 1] >= 0 ? 'var(--success)' : 'var(--error)';
+  const zeroY = y(0).toFixed(1);
+  return `
+    <div class="ec-wrap">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="ec-svg">
+        <line x1="0" y1="${zeroY}" x2="${W}" y2="${zeroY}" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="3 3"/>
+        <path d="${area}" fill="${col}" opacity="0.12"/>
+        <path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      <div class="ec-foot"><span>${closed.length} closed trades</span><span class="mono ${pnlClass(pts[n-1])}">${formatPnl(pts[n-1])}</span></div>
+    </div>`;
+}
+
+// Apply fresh live prices to the DOM in place — no panel re-render, no flicker.
+function setPnlClass(el, v) {
+  el.classList.remove('pnl-positive', 'pnl-negative', 'pnl-neutral');
+  el.classList.add(pnlClass(v));
+}
+function updateLiveDOM() {
+  document.querySelectorAll('[data-live]').forEach(el => {
+    const type = el.getAttribute('data-live');
+    const live = window.livePrices[el.getAttribute('data-sym')];
+    if (!live) return;
+    const qty = Number(el.getAttribute('data-qty'));
+    if (type === 'price') {
+      el.textContent = formatINR(live.price);
+    } else if (type === 'unreal') {
+      const entry = Number(el.getAttribute('data-entry'));
+      const pnl = (live.price - entry) * qty;
+      el.textContent = formatPnl(pnl);
+      setPnlClass(el, pnl);
+    } else if (type === 'corecur') {
+      el.textContent = formatINR(live.price * qty);
+    } else if (type === 'corebadge') {
+      const invested = qty * Number(el.getAttribute('data-avg'));
+      const pnl = qty * live.price - invested;
+      const pct = invested ? (pnl / invested) * 100 : 0;
+      el.textContent = `${formatPnl(pnl)} (${pct.toFixed(2)}%)`;
+      el.classList.remove('success', 'error');
+      el.classList.add(pnl >= 0 ? 'success' : 'error');
+    } else if (type === 'wlquote') {
+      el.textContent = `${formatINR(live.price)} (${live.changePct >= 0 ? '+' : ''}${(live.changePct || 0).toFixed(2)}%)`;
+      el.classList.remove('success', 'error');
+      el.classList.add((live.change || 0) >= 0 ? 'success' : 'error');
+    }
+  });
+  updateHoldingsSummary();
+}
+
+function renderStats() {
   const ranges = [['1w','1W'],['1m','1M'],['ytd','YTD'],['all','All']];
   const closed = closedInRange(dashboardRange);
   const totalNet = closed.reduce((s, t) => s + netPnl(t), 0);
@@ -2923,7 +3158,7 @@ function renderDashboard() {
 
   const latest = [...closed].sort((a, b) => new Date(b.closedAt || 0) - new Date(a.closedAt || 0)).slice(0, 6);
 
-  document.getElementById('panel-dashboard').innerHTML = `
+  document.getElementById('panel-stats').innerHTML = `
     <div class="seg full" style="margin-bottom: 16px;">
       ${ranges.map(([v, l]) => `<button class="seg-btn ${dashboardRange === v ? 'active' : ''}" onclick="setDashboardRange('${v}')">${l}</button>`).join('')}
     </div>
@@ -2956,7 +3191,13 @@ function renderDashboard() {
       </div>
     </div>
 
-    ${renderCurrentHoldings()}
+    <div class="card" style="margin-top: 14px;">
+      <div class="card-header">
+        <h3 class="card-title">Equity Curve</h3>
+        <span style="color:var(--text-muted);font-size:11px;">Cumulative realized P&amp;L</span>
+      </div>
+      ${equityCurveSVG()}
+    </div>
 
     <div class="card" style="margin-top: 14px;">
       <div class="card-header">
@@ -2989,7 +3230,7 @@ function renderDashboard() {
   `;
 }
 
-function setDashboardRange(r) { dashboardRange = r; renderDashboard(); }
+function setDashboardRange(r) { dashboardRange = r; renderStats(); }
 
 /* ========================================================================
    MY JOURNAL — Daily / Monthly / Calendar
@@ -3280,7 +3521,9 @@ function renderTrades() {
 function setSubTab(group, value) {
   activeSubTab[group] = value;
   if (group === 'trades') renderTrades();
-  if (group === 'wl') renderWatchlist();
+  // 'wl' tabs live on both the Watchlist panel and the homepage section, so
+  // re-render whichever panel is currently active.
+  if (group === 'wl') renderActivePanel();
 }
 
 function renderTradesContent(tags) {
@@ -3434,8 +3677,8 @@ function renderTradeCard(t) {
           <div class="trade-field"><span class="trade-field-label">Exit Qty</span><span class="trade-field-value">${escapeHtml(t.exitQty)}</span></div>
           <div class="trade-field"><span class="trade-field-label">Closed</span><span class="trade-field-value">${formatDate(t.closedAt || t.exitDate, { day:'2-digit', month:'short', year:'2-digit' })}</span></div>
         ` : `
-          ${live ? `<div class="trade-field"><span class="trade-field-label">Live Price</span><span class="trade-field-value">${formatINR(live.price)}</span></div>` : ''}
-          ${unrealized !== null ? `<div class="trade-field"><span class="trade-field-label">Unrealized P&L</span><span class="trade-field-value ${pnlClass(unrealized)}">${formatPnl(unrealized)}</span></div>` : ''}
+          <div class="trade-field"><span class="trade-field-label">Live Price</span><span class="trade-field-value" data-live="price" data-sym="${escapeHtml(t.symbol)}">${live ? formatINR(live.price) : '—'}</span></div>
+          <div class="trade-field"><span class="trade-field-label">Unrealized P&L</span><span class="trade-field-value ${unrealized !== null ? pnlClass(unrealized) : ''}" data-live="unreal" data-sym="${escapeHtml(t.symbol)}" data-qty="${t.entryQty}" data-entry="${t.entryPrice}">${unrealized !== null ? formatPnl(unrealized) : '—'}</span></div>
         `}
       </div>
 
@@ -4396,7 +4639,6 @@ function openZoomImage(src) {
    PRIORITY
    ======================================================================== */
 function renderPriority() {
-  const items = [...state.priority].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   document.getElementById('panel-priority').innerHTML = `
     <div class="page-header">
       <div>
@@ -4405,7 +4647,19 @@ function renderPriority() {
       </div>
       <button class="btn btn-sm" onclick="openPriorityModal()">+ Add Setup</button>
     </div>
-    ${items.length ? items.map(p => {
+    ${priorityBodyHTML()}
+  `;
+}
+function priorityBodyHTML() {
+  const items = [...state.priority].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  if (!items.length) return `
+      <div class="empty-state" style="padding:24px 0;">
+        <div class="empty-state-icon">⭐</div>
+        <div class="empty-state-title">No priority setups</div>
+        <div class="empty-state-desc">Plan your trades with trigger, target, and SL before pulling the trigger.</div>
+        <button class="btn" onclick="openPriorityModal()">+ Add Setup</button>
+      </div>`;
+  return items.map(p => {
       const rr = (p.trigger && p.target && p.sl) ?
         ((Number(p.target) - Number(p.trigger)) / Math.abs(Number(p.trigger) - Number(p.sl))).toFixed(2) : null;
       return `
@@ -4433,14 +4687,7 @@ function renderPriority() {
           </div>
         </div>
       `;
-    }).join('') : `
-      <div class="empty-state">
-        <div class="empty-state-icon">⭐</div>
-        <div class="empty-state-title">No priority setups</div>
-        <div class="empty-state-desc">Plan your trades with trigger, target, and SL before pulling the trigger.</div>
-        <button class="btn" onclick="openPriorityModal()">+ Add Setup</button>
-      </div>`}
-  `;
+  }).join('');
 }
 
 function openPriorityModal(id) {
@@ -4532,7 +4779,6 @@ function renderWatchlist() {
   if (!state.watchlists.find(w => w.id === activeSubTab.wl)) {
     activeSubTab.wl = state.watchlists[0].id;
   }
-  const active = state.watchlists.find(w => w.id === activeSubTab.wl);
   document.getElementById('panel-watchlist').innerHTML = `
     <div class="page-header">
       <div>
@@ -4545,6 +4791,18 @@ function renderWatchlist() {
         <button class="btn btn-sm" onclick="newWatchlistPrompt()">+ New List</button>
       </div>
     </div>
+    ${watchlistBodyHTML('wlCards')}
+  `;
+  initWatchlistDrag('wlCards');
+}
+// Watchlist body (tabs + add buttons + cards) — reused on the homepage section.
+// `containerId` keeps the cards container unique per host panel so drag works.
+function watchlistBodyHTML(containerId) {
+  if (!state.watchlists.length) state.watchlists.push({ id: 'w1', name: 'Default', symbols: [] });
+  if (!state.watchlists.find(w => w.id === activeSubTab.wl)) activeSubTab.wl = state.watchlists[0].id;
+  const active = state.watchlists.find(w => w.id === activeSubTab.wl);
+  const cid = containerId || 'wlCards';
+  return `
     <div class="wl-tabs">
       ${state.watchlists.map(w => `
         <div class="wl-tab ${w.id === active.id ? 'active' : ''}" onclick="setSubTab('wl','${w.id}')">
@@ -4557,10 +4815,19 @@ function renderWatchlist() {
       <button class="btn btn-ghost btn-sm" onclick="renameWatchlistPrompt('${active.id}')">Rename</button>
       ${state.watchlists.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteWatchlistPrompt('${active.id}')">Delete List</button>` : ''}
     </div>
-    ${active.symbols.length ? `<div id="wlCards">${wlOrderedSymbols(active.symbols).map(s => {
-      const live = window.livePrices[s.symbol];
-      const sym = escapeHtml(s.symbol);
-      return `
+    ${active.symbols.length ? `<div id="${cid}">${wlOrderedSymbols(active.symbols).map(s => wlCardHTML(active, s)).join('')}</div>` : `
+      <div class="empty-state" style="padding:24px 0;">
+        <div class="empty-state-icon">👁</div>
+        <div class="empty-state-title">No symbols in this list</div>
+        <div class="empty-state-desc">Add symbols to track prices and set GTT alerts.</div>
+        <button class="btn" onclick="addWatchlistSymbolPrompt()">+ Add Symbol</button>
+      </div>`}
+  `;
+}
+function wlCardHTML(active, s) {
+  const live = window.livePrices[s.symbol];
+  const sym = escapeHtml(s.symbol);
+  return `
         <div class="trade-card${s.starred ? ' wl-starred' : ''}" data-symbol="${sym}">
           <div class="trade-header">
             <div style="display:flex;align-items:flex-start;gap:8px;min-width:0;">
@@ -4571,7 +4838,7 @@ function renderWatchlist() {
               </div>
             </div>
             <div class="trade-badges">
-              ${live ? `<span class="badge ${live.change >= 0 ? 'success' : 'error'}">${formatINR(live.price)} (${live.changePct >= 0 ? '+' : ''}${(live.changePct || 0).toFixed(2)}%)</span>` : '<span class="badge">No price</span>'}
+              <span class="badge ${live ? (live.change >= 0 ? 'success' : 'error') : ''}" data-live="wlquote" data-sym="${sym}">${live ? `${formatINR(live.price)} (${live.changePct >= 0 ? '+' : ''}${(live.changePct || 0).toFixed(2)}%)` : 'No price'}</span>
               ${s.gtt && s.gtt.enabled ? `<span class="badge ${s.gtt.status === 'triggered' ? 'warning' : 'primary'}">GTT ${s.gtt.type} ${formatINR(s.gtt.triggerPrice)} ${s.gtt.status === 'triggered' ? '⚡' : ''}</span>` : ''}
             </div>
           </div>
@@ -4585,15 +4852,6 @@ function renderWatchlist() {
           </div>
         </div>
       `;
-    }).join('')}</div>` : `
-      <div class="empty-state">
-        <div class="empty-state-icon">👁</div>
-        <div class="empty-state-title">No symbols in this list</div>
-        <div class="empty-state-desc">Add symbols to track prices and set GTT alerts.</div>
-        <button class="btn" onclick="addWatchlistSymbolPrompt()">+ Add Symbol</button>
-      </div>`}
-  `;
-  initWatchlistDrag();
 }
 
 /* Pinned symbols float to the top; manual drag order is preserved within each
@@ -4628,8 +4886,9 @@ async function toggleWatchlistStar(wlId, symbol) {
 /* Pointer-based drag reorder (works on touch + mouse). The dragged card is
    reordered live in the DOM as the pointer moves; the new order is committed
    to state on release. */
-function initWatchlistDrag() {
-  const container = document.getElementById('wlCards');
+function initWatchlistDrag(rootId) {
+  const cid = rootId || 'wlCards';
+  const container = document.getElementById(cid);
   if (!container) return;
   container.querySelectorAll('.wl-drag-handle').forEach(handle => {
     handle.addEventListener('pointerdown', e => {
@@ -4652,7 +4911,7 @@ function initWatchlistDrag() {
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
         dragEl.classList.remove('wl-dragging');
-        commitWatchlistOrder();
+        commitWatchlistOrder(cid);
       };
       document.addEventListener('pointermove', onMove);
       document.addEventListener('pointerup', onUp);
@@ -4660,8 +4919,8 @@ function initWatchlistDrag() {
     });
   });
 }
-async function commitWatchlistOrder() {
-  const container = document.getElementById('wlCards');
+async function commitWatchlistOrder(rootId) {
+  const container = document.getElementById(rootId || 'wlCards');
   const active = state.watchlists.find(w => w.id === activeSubTab.wl);
   if (!container || !active) return;
   const order = [...container.querySelectorAll('.trade-card')].map(c => c.dataset.symbol);
