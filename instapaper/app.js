@@ -943,8 +943,7 @@ const Icons={
   file:s=>Svg({size:s},P('M6.5 4c0-.8.7-1.5 1.5-1.5h5l4 4V20c0 .8-.7 1.5-1.5 1.5H8c-.8 0-1.5-.7-1.5-1.5V4Z'),P('M13 2.5V6.5h4')),
   pin:(s,fill)=>Svg({size:s},h('path',{d:'M9 3.5h6l-.8 5 2.8 3.2H7l2.8-3.2-.8-5Z',fill:fill?'currentColor':'none',stroke:'currentColor',strokeWidth:1.6,strokeLinejoin:'round'}),P('M12 11.7V20')),
   crop:s=>Svg({size:s},P('M6.5 2.5v15h15'),P('M2.5 6.5h15v15')),
-  rotate:s=>Svg({size:s},P('M20 11a8 8 0 1 0-2.3 5.6'),P('M20 5v6h-6')),
-  clock:s=>Svg({size:s},h('circle',{cx:12,cy:12,r:8.5,stroke:'currentColor',strokeWidth:1.7}),P('M12 7v5l3 3'))
+  rotate:s=>Svg({size:s},P('M20 11a8 8 0 1 0-2.3 5.6'),P('M20 5v6h-6'))
 };
 /* ============================== shared UI ============================== */
 const iconBtnS={width:42,height:42,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,flexShrink:0};
@@ -1899,7 +1898,6 @@ function BriefView({T,brief,onBrief,toastFn}){
   // Per-group collapse for the brief; persisted so it survives reloads.
   const [collapsed,setCollapsed]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem('insta_brief_collapsed')||'[]'))}catch(e){return new Set()}});
   const toggleCollapse=key=>setCollapsed(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);try{localStorage.setItem('insta_brief_collapsed',JSON.stringify([...n]))}catch(e){}return n});
-  const [logOpen,setLogOpen]=useState(false);
   const [briefLog,setBriefLog]=useState(loadBriefLog);
   useEffect(()=>{
     if(!win.key)return;
@@ -1980,14 +1978,31 @@ function BriefView({T,brief,onBrief,toastFn}){
     g?h('button',{onClick:()=>{setGName(g.name);setGrp({rename:g.id})},className:'act90',style:{display:'flex',color:T.sub,padding:3}},Icons.pencil(16)):null,
     g?h('button',{onClick:()=>{onBrief(b=>({...b,items:b.items.map(i=>i.groupId===g.id?{...i,groupId:null}:i),groups:b.groups.filter(x=>x.id!==g.id)}))},className:'act90',style:{display:'flex',color:T.danger,padding:3}},Icons.trash(16)):null,
     h('button',{onClick:()=>setEdit({groupId:g?g.id:null,kind:'link',name:'',url:''}),className:'act90',style:{display:'flex',color:T.accent,padding:3}},Icons.plus(18)));};
+  // Brief history as a collapsible section (open when '_history' is in the set).
+  const histMissed=briefLog.reduce((n,e)=>n+e.items.reduce((m,i)=>m+i.entries.length,0),0);
+  const historySection=()=>{const isOpen=collapsed.has('_history');return h('div',{style:{marginTop:8,borderTop:'1px solid '+T.hair}},
+    h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'14px 4px 4px'}},
+      h('button',{onClick:()=>toggleCollapse('_history'),className:'act90','aria-label':isOpen?'Collapse history':'Expand history',style:{display:'flex',color:T.sub,padding:3,transform:isOpen?'rotate(90deg)':'none',transition:'transform 160ms'}},Icons.chevR(15)),
+      h('div',{onClick:()=>toggleCollapse('_history'),style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}},'History'+(histMissed?' · '+histMissed+' missed':'')),
+      briefLog.length?h('button',{onClick:()=>{setBriefLog([]);saveBriefLog([])},className:'act90','aria-label':'Clear history',style:{display:'flex',color:T.danger,padding:3}},Icons.trash(16)):null),
+    isOpen?(briefLog.length===0
+      ?h('div',{style:{fontSize:12.5,color:T.sub,padding:'6px 4px 10px',lineHeight:1.5}},'Updates you miss are saved here automatically for 14 days, so you can catch up later.')
+      :h('div',null,briefLog.map(entry=>h('div',{key:entry.id,style:{padding:'8px 2px 10px',borderBottom:'1px solid '+T.hair}},
+        h('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:4}},
+          h('div',{style:{flex:1,fontSize:12.5,fontWeight:600,color:T.fg}},entry.slotName+' · '+fmtLogDate(entry.snapshotAt)),
+          h('span',{style:{fontSize:11,fontWeight:600,color:'#fff',background:'#d4564a',borderRadius:999,padding:'2px 8px'}},entry.items.reduce((n,i)=>n+i.entries.length,0)+' missed')),
+        entry.items.map(it=>h('div',{key:it.id,style:{padding:'2px 0 6px'}},
+          h('div',{style:{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:T.sub,marginBottom:3}},it.name+(it.groupName?' · '+it.groupName:'')),
+          it.entries.map(e=>h('div',{key:e.url||e.publishedMs,onClick:()=>openExternalUrl(e.url),style:{display:'flex',gap:10,padding:'4px 0',cursor:'pointer',alignItems:'flex-start'}},
+            h('span',{style:{fontSize:11,color:T.meta,flexShrink:0,paddingTop:2}},new Date(e.publishedMs).toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'})),
+            h('span',{style:{fontSize:13,color:T.fg,flex:1,lineHeight:1.4}},(e.title||'(no title)').slice(0,150)))))))))):null);};
 
   return h('div',null,
     h('div',{className:'sx',style:{display:'flex',gap:7,overflowX:'auto',padding:'8px 14px 2px'}},
       slots.map(s=>h('button',{key:s.id,onClick:()=>setSel(s.id),className:'act95',style:{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:1,padding:'7px 13px',borderRadius:11,border:'1px solid '+(s.id===win.sel?T.accent:T.hair),background:s.id===win.sel?T.card:'transparent'}},
         h('span',{style:{fontSize:13,fontWeight:600,color:s.id===win.sel?T.fg:T.sub}},s.name+(s.id===win.activeSlotId?' •':'')),
         h('span',{style:{fontSize:10.5,color:T.sub}},fmtClock(s.time)))),
-      h('button',{onClick:()=>setSlotSheet(true),className:'act90',style:{flexShrink:0,display:'flex',alignItems:'center',color:T.sub,padding:'0 6px'}},Icons.calendar(18)),
-      h('button',{onClick:()=>setLogOpen(true),className:'act90','aria-label':'Brief history',style:{flexShrink:0,display:'flex',alignItems:'center',color:briefLog.length?T.accent:T.sub,padding:'0 6px'}},Icons.clock(18))),
+      h('button',{onClick:()=>setSlotSheet(true),className:'act90',style:{flexShrink:0,display:'flex',alignItems:'center',color:T.sub,padding:'0 6px'}},Icons.calendar(18))),
     h('div',{style:{display:'flex',alignItems:'center',gap:12,padding:'6px 16px 4px'}},
       h('div',{style:{position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}},
         h(Ring,{T,frac:total?doneN/total:0,size:46}),
@@ -2002,6 +2017,7 @@ function BriefView({T,brief,onBrief,toastFn}){
         :h(EmptyState,{T,icon:Icons.sun(40),title:'Your daily brief',sub:'Group the social apps, websites and YouTube channels you go through each day, then check them off.'}),
       h('button',{onClick:()=>{setGName('');setGrp({})},className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:18,padding:'11px 14px',borderRadius:11,border:'1px dashed '+T.hair,color:T.fg,fontSize:14,fontWeight:500}},Icons.plus(18),'New group'),
       h('button',{onClick:()=>setEdit({groupId:groups[0]?groups[0].id:null,kind:'link',name:'',url:''}),className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:10,padding:'11px 14px',borderRadius:11,background:T.card,color:T.fg,fontSize:14,fontWeight:600}},Icons.plus(18),'Add item'),
+      historySection(),
       h('div',{style:{height:'calc(24px + '+SAFE_B+')'}})),
 
     slotSheet?h(Sheet,{T,title:'Brief times',maxH:'90%',onClose:()=>setSlotSheet(false)},
@@ -2048,21 +2064,7 @@ function BriefView({T,brief,onBrief,toastFn}){
           :edit.kind==='telegram'?'Public channel only (t.me/<name> or @name). The brief shows its new posts.'
           :edit.kind==='rss'?'Any RSS/Atom feed — a news site, blog, Substack, subreddit (.../.rss), or an X/Instagram bridge URL.'
           :'A site or app shortcut — opens in your browser. Use this for accounts with no public feed (Instagram, X, WhatsApp).'),
-        h('button',{onClick:()=>saveItem(edit),disabled:busy,className:'act96',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:8,width:'100%',padding:'13px',borderRadius:11,background:T.fg,color:T.bg,fontSize:15,fontWeight:600,opacity:busy?.6:1}},busy?h(Spinner,{T,size:15}):null,busy?'Fetching…':(edit.id?'Save':'Add')))):null,
-
-    logOpen?h(Sheet,{T,title:'Brief history',onClose:()=>setLogOpen(false)},
-      briefLog.length===0
-        ?h('div',{style:{padding:'28px 20px',color:T.sub,fontSize:14,textAlign:'center',lineHeight:1.6}},'No history yet. When a brief window closes with unread updates, they are saved here automatically for 14 days.')
-        :h('div',{style:{paddingBottom:'calc(18px + '+SAFE_B+')'}},
-          briefLog.map(entry=>h('div',{key:entry.id,style:{borderBottom:'1px solid '+T.hair}},
-            h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'12px 18px 6px'}},
-              h('div',{style:{flex:1,fontSize:13.5,fontWeight:700,color:T.fg}},entry.slotName+' · '+fmtLogDate(entry.snapshotAt)),
-              h('span',{style:{fontSize:11.5,fontWeight:600,color:'#fff',background:'#d4564a',borderRadius:999,padding:'2px 8px'}},entry.items.reduce((n,i)=>n+i.entries.length,0)+' missed')),
-            entry.items.map(it=>h('div',{key:it.id,style:{padding:'2px 18px 10px'}},
-              h('div',{style:{fontSize:11.5,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:T.sub,marginBottom:4}},it.name+(it.groupName?' · '+it.groupName:'')),
-              it.entries.map(e=>h('div',{key:e.url||e.publishedMs,onClick:()=>openExternalUrl(e.url),style:{display:'flex',gap:10,padding:'5px 0',cursor:'pointer',alignItems:'flex-start'}},
-                h('span',{style:{fontSize:11,color:T.meta,flexShrink:0,paddingTop:2}},new Date(e.publishedMs).toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'})),
-                h('span',{style:{fontSize:13,color:T.fg,flex:1,lineHeight:1.4}},(e.title||'(no title)').slice(0,150)))))))))):null);
+        h('button',{onClick:()=>saveItem(edit),disabled:busy,className:'act96',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:8,width:'100%',padding:'13px',borderRadius:11,background:T.fg,color:T.bg,fontSize:15,fontWeight:600,opacity:busy?.6:1}},busy?h(Spinner,{T,size:15}):null,busy?'Fetching…':(edit.id?'Save':'Add')))):null);
 }
 
 function NotesList({T,articles,onOpenArticle,onOpenHighlight}){
