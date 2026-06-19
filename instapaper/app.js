@@ -1908,25 +1908,33 @@ function BriefView({T,brief,onBrief,toastFn}){
   const removeItem=id=>onBrief(b=>{const fd=Object.assign({},b.feeds);delete fd[id];return{...b,items:b.items.filter(x=>x.id!==id),feeds:fd}});
   const setItemGroup=(id,groupId)=>onBrief(b=>({...b,items:b.items.map(x=>x.id===id?{...x,groupId}:x)}));
   const setSlot=(id,patch)=>onBrief(b=>({...b,slots:(b.slots||[]).map(s=>s.id===id?{...s,...patch}:s)}));
-  const saveItem=async f=>{
+  const saveItem=f=>{
     const raw=(f.url||'').trim();if(!raw){toastFn('Enter a link or handle');return}
-    const patch={kind:f.kind,channelId:'',handle:'',feedUrl:'',url:''};
-    setBusy(true);
-    if(f.kind==='youtube'){patch.channelId=f.channelId||await resolveYtChannelId(raw);patch.url=patch.channelId?'https://www.youtube.com/channel/'+patch.channelId:(ytTargetUrl(raw)||raw)}
+    const patch={kind:f.kind,channelId:f.channelId||'',handle:'',feedUrl:'',url:''};
+    if(f.kind==='youtube'){patch.url=patch.channelId?'https://www.youtube.com/channel/'+patch.channelId:(ytTargetUrl(raw)||raw)}
     else if(f.kind==='telegram'){patch.handle=tgHandle(raw);patch.url=patch.handle?'https://t.me/'+patch.handle:(normalizeUrl(raw)||raw)}
     else if(f.kind==='rss'){patch.feedUrl=normalizeUrl(raw)||raw;patch.url=patch.feedUrl}
     else{patch.url=normalizeUrl(raw)||raw}
-    setBusy(false);
     let ytName='';if(f.kind==='youtube'){const hm=raw.match(/@([\w.\-]+)/)||(/^[\w.\-]+$/.test(raw)&&!/youtu/i.test(raw)?[null,raw]:null);if(hm)ytName='@'+hm[1]}
     patch.name=(f.name||'').trim()||(patch.handle?'@'+patch.handle:'')||ytName||domainOf(patch.url)||'Item';
-    if(f.kind==='youtube'&&!patch.channelId)toastFn('Couldn’t find that channel — it’ll still open as a link');
     if(f.kind==='telegram'&&!patch.handle)toastFn('Couldn’t read that Telegram handle');
+    // Add/patch the item immediately — never block the sheet on the network.
     let itemId=f.id;
     if(f.id)onBrief(b=>({...b,items:b.items.map(x=>x.id===f.id?{...x,...patch}:x)}));
     else{itemId=uid();const ni={id:itemId,groupId:f.groupId||null,addedAt:Date.now(),...patch};onBrief(b=>({...b,items:b.items.concat([ni])}))}
     setEdit(null);
-    const probe={kind:patch.kind,channelId:patch.channelId,handle:patch.handle,feedUrl:patch.feedUrl};
-    if(hasFeed(probe)){try{const es=await fetchFeed(probe);if(es)onBrief(b=>({...b,feeds:{...(b.feeds||{}),[itemId]:{fetchedAt:Date.now(),entries:es}}}))}catch(e){}}
+    // Resolve a YouTube channel id (if needed) and fetch the first feed batch in
+    // the background, patching the item once they arrive.
+    (async()=>{
+      let cid=patch.channelId;
+      if(f.kind==='youtube'&&!cid){
+        try{cid=await resolveYtChannelId(raw)}catch(e){}
+        if(cid)onBrief(b=>({...b,items:b.items.map(x=>x.id===itemId?{...x,channelId:cid,url:'https://www.youtube.com/channel/'+cid}:x)}));
+        else toastFn('Couldn’t find that channel — it’ll still open as a link');
+      }
+      const probe={kind:patch.kind,channelId:cid,handle:patch.handle,feedUrl:patch.feedUrl};
+      if(hasFeed(probe)){try{const es=await fetchFeed(probe);if(es)onBrief(b=>({...b,feeds:{...(b.feeds||{}),[itemId]:{fetchedAt:Date.now(),entries:es}}}))}catch(e){}}
+    })();
   };
   const total=items.length,doneN=items.filter(i=>doneIds.includes(i.id)).length;
   const newCount=win.future?0:items.reduce((n,it)=>n+(hasFeed(it)?newEntries(it).length:0),0);
@@ -2922,6 +2930,17 @@ function App(){
   const addByUrl=async(url,folderId)=>{
     const dup=dataRef.current.articles.find(a=>a.url===url);
     if(dup){setAddS(null);toastFn('Already in your list');return}
+    // Social posts save instantly as link cards — enrich Open Graph data later.
+    const soc=socialOf(url);
+    if(soc){
+      const id=uid();const label=PLATFORM_LABEL[soc.platform]||'Post';const handle=soc.handle?('@'+soc.handle):'';
+      const base=handle?handle+' on '+label:label+' post';
+      const article={id,url,title:base,source:label,author:handle,image:'',html:'',text:'',excerpt:'',words:0,readMin:0,isVideo:false,videoId:null,isPost:true,platform:soc.platform,publishedAt:0,addedAt:Date.now(),liked:false,archived:false,folderId:folderId||null,tags:[],progress:0,opens:0,highlights:[]};
+      update(d=>({...d,articles:[article,...d.articles]}));
+      setAddS(null);toastFn(label+' post saved');
+      (async()=>{const m=await fetchSocialMeta(url);if(m&&(m.title||m.image||m.desc))patchArticle(id,x=>({title:(x.title===base&&m.title)?m.title:x.title,image:x.image||m.image||'',excerpt:x.excerpt||(m.desc?m.desc.slice(0,220).trim():'')}))})();
+      return;
+    }
     const rec=await fetchArticleData(url); // throws on failure -> AddSheet shows error
     const article=Object.assign(rec,{id:uid(),addedAt:Date.now(),liked:false,archived:false,folderId:folderId||null,tags:[],progress:0,opens:0,highlights:[]});
     update(d=>({...d,articles:[article,...d.articles]}));
