@@ -943,7 +943,8 @@ const Icons={
   file:s=>Svg({size:s},P('M6.5 4c0-.8.7-1.5 1.5-1.5h5l4 4V20c0 .8-.7 1.5-1.5 1.5H8c-.8 0-1.5-.7-1.5-1.5V4Z'),P('M13 2.5V6.5h4')),
   pin:(s,fill)=>Svg({size:s},h('path',{d:'M9 3.5h6l-.8 5 2.8 3.2H7l2.8-3.2-.8-5Z',fill:fill?'currentColor':'none',stroke:'currentColor',strokeWidth:1.6,strokeLinejoin:'round'}),P('M12 11.7V20')),
   crop:s=>Svg({size:s},P('M6.5 2.5v15h15'),P('M2.5 6.5h15v15')),
-  rotate:s=>Svg({size:s},P('M20 11a8 8 0 1 0-2.3 5.6'),P('M20 5v6h-6'))
+  rotate:s=>Svg({size:s},P('M20 11a8 8 0 1 0-2.3 5.6'),P('M20 5v6h-6')),
+  clock:s=>Svg({size:s},h('circle',{cx:12,cy:12,r:8.5,stroke:'currentColor',strokeWidth:1.7}),P('M12 7v5l3 3'))
 };
 /* ============================== shared UI ============================== */
 const iconBtnS={width:42,height:42,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,flexShrink:0};
@@ -1874,6 +1875,12 @@ function BriefItem({T,item,entries,feedy,done,onToggle,onOpen,onEntry,onLongPres
         h('div',{style:{fontSize:11.5,color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},domainOf(item.url)))),
     h('span',{onClick:onOpen,style:{color:T.sub,display:'flex',cursor:'pointer',flexShrink:0}},Icons.external(17)));
 }
+const BRIEF_LOG_KEY='insta_brief_log_v1';
+const BRIEF_LASTWIN_KEY='insta_brief_lastwin_v1';
+const LOG_MAX_AGE=14*24*60*60*1000;
+const loadBriefLog=()=>{try{return JSON.parse(localStorage.getItem(BRIEF_LOG_KEY)||'[]')}catch(e){return[]}};
+const saveBriefLog=l=>{try{localStorage.setItem(BRIEF_LOG_KEY,JSON.stringify(l))}catch(e){}};
+const fmtLogDate=ts=>{const d=new Date(ts),now=new Date(),diff=Math.floor((now-d)/86400000);if(diff===0)return'Today';if(diff===1)return'Yesterday';return d.toLocaleDateString('en',{month:'short',day:'numeric'})};
 function BriefView({T,brief,onBrief,toastFn}){
   const groups=brief.groups||[],items=brief.items||[],feeds=brief.feeds||{};
   const slots=(brief.slots&&brief.slots.length?brief.slots:BRIEF_SLOTS0).slice().sort((a,b)=>tmin(a.time)-tmin(b.time));
@@ -1892,6 +1899,31 @@ function BriefView({T,brief,onBrief,toastFn}){
   // Per-group collapse for the brief; persisted so it survives reloads.
   const [collapsed,setCollapsed]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem('insta_brief_collapsed')||'[]'))}catch(e){return new Set()}});
   const toggleCollapse=key=>setCollapsed(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);try{localStorage.setItem('insta_brief_collapsed',JSON.stringify([...n]))}catch(e){}return n});
+  const [logOpen,setLogOpen]=useState(false);
+  const [briefLog,setBriefLog]=useState(loadBriefLog);
+  useEffect(()=>{
+    if(!win.key)return;
+    let stored=null;try{stored=JSON.parse(localStorage.getItem(BRIEF_LASTWIN_KEY)||'null')}catch(e){}
+    if(stored&&stored.key&&stored.key!==win.key){
+      const oldDoneIds=(brief.done&&brief.done.key===stored.key)?brief.done.ids:[];
+      const missed=[];
+      for(const it of items){
+        if(oldDoneIds.includes(it.id)||!hasFeed(it))continue;
+        const c=feeds[it.id];if(!c||!c.entries)continue;
+        const es=c.entries.filter(e=>e.publishedMs>=stored.start&&e.publishedMs<=stored.end);
+        if(!es.length)continue;
+        const g=groups.find(x=>x.id===it.groupId);
+        missed.push({id:it.id,name:it.name,url:it.url,kind:it.kind,groupId:it.groupId,groupName:g?g.name:null,entries:es.map(e=>({title:e.title,url:e.url,publishedMs:e.publishedMs}))});
+      }
+      if(missed.length){
+        const entry={id:uid(),windowKey:stored.key,slotName:stored.slotName,snapshotAt:Date.now(),start:stored.start,end:stored.end,items:missed};
+        const cutoff=Date.now()-LOG_MAX_AGE;
+        const newLog=[entry,...briefLog].filter(e=>e.snapshotAt>cutoff).slice(0,300);
+        setBriefLog(newLog);saveBriefLog(newLog);
+      }
+    }
+    try{localStorage.setItem(BRIEF_LASTWIN_KEY,JSON.stringify({key:win.key,start:win.start,end:win.end,slotName:curSlot.name}))}catch(e){}
+  },[win.key]);
   useEffect(()=>{ // best-effort refresh of each feed's recent items
     let live=true;
     (async()=>{for(const it of items){
@@ -1942,9 +1974,9 @@ function BriefView({T,brief,onBrief,toastFn}){
   const ungrouped=items.filter(i=>!i.groupId||!groups.some(g=>g.id===i.groupId));
   if(ungrouped.length)sections.push({g:null,list:ungrouped});
   const itemRow=it=>h(BriefItem,{key:it.id,T,item:it,feedy:hasFeed(it),entries:win.future?[]:newEntries(it),done:doneIds.includes(it.id),onToggle:()=>toggle(it.id),onOpen:()=>open(it),onEntry:openEntry,onLongPress:()=>setAct(it)});
-  const sectionHead=(g,list)=>{const key=g?g.id:'_other';const isOpen=!collapsed.has(key);return h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'14px 4px 4px'}},
+  const sectionHead=(g,list)=>{const key=g?g.id:'_other';const isOpen=!collapsed.has(key);const groupNew=win.future?0:list.reduce((n,it)=>n+(hasFeed(it)?newEntries(it).length:0),0);return h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'14px 4px 4px'}},
     h('button',{onClick:()=>toggleCollapse(key),className:'act90','aria-label':isOpen?'Collapse group':'Expand group',style:{display:'flex',color:T.sub,padding:3,transform:isOpen?'rotate(90deg)':'none',transition:'transform 160ms'}},Icons.chevR(15)),
-    h('div',{onClick:()=>toggleCollapse(key),style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}},(g?g.name:'Other')+' · '+list.filter(i=>doneIds.includes(i.id)).length+'/'+list.length),
+    h('div',{onClick:()=>toggleCollapse(key),style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}},(g?g.name:'Other')+' · '+list.filter(i=>doneIds.includes(i.id)).length+'/'+list.length+(groupNew?' · '+groupNew+' new':'')),
     g?h('button',{onClick:()=>{setGName(g.name);setGrp({rename:g.id})},className:'act90',style:{display:'flex',color:T.sub,padding:3}},Icons.pencil(16)):null,
     g?h('button',{onClick:()=>{onBrief(b=>({...b,items:b.items.map(i=>i.groupId===g.id?{...i,groupId:null}:i),groups:b.groups.filter(x=>x.id!==g.id)}))},className:'act90',style:{display:'flex',color:T.danger,padding:3}},Icons.trash(16)):null,
     h('button',{onClick:()=>setEdit({groupId:g?g.id:null,kind:'link',name:'',url:''}),className:'act90',style:{display:'flex',color:T.accent,padding:3}},Icons.plus(18)));};
@@ -1954,7 +1986,8 @@ function BriefView({T,brief,onBrief,toastFn}){
       slots.map(s=>h('button',{key:s.id,onClick:()=>setSel(s.id),className:'act95',style:{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-start',gap:1,padding:'7px 13px',borderRadius:11,border:'1px solid '+(s.id===win.sel?T.accent:T.hair),background:s.id===win.sel?T.card:'transparent'}},
         h('span',{style:{fontSize:13,fontWeight:600,color:s.id===win.sel?T.fg:T.sub}},s.name+(s.id===win.activeSlotId?' •':'')),
         h('span',{style:{fontSize:10.5,color:T.sub}},fmtClock(s.time)))),
-      h('button',{onClick:()=>setSlotSheet(true),className:'act90',style:{flexShrink:0,display:'flex',alignItems:'center',color:T.sub,padding:'0 6px'}},Icons.calendar(18))),
+      h('button',{onClick:()=>setSlotSheet(true),className:'act90',style:{flexShrink:0,display:'flex',alignItems:'center',color:T.sub,padding:'0 6px'}},Icons.calendar(18)),
+      h('button',{onClick:()=>setLogOpen(true),className:'act90','aria-label':'Brief history',style:{flexShrink:0,display:'flex',alignItems:'center',color:briefLog.length?T.accent:T.sub,padding:'0 6px'}},Icons.clock(18))),
     h('div',{style:{display:'flex',alignItems:'center',gap:12,padding:'6px 16px 4px'}},
       h('div',{style:{position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}},
         h(Ring,{T,frac:total?doneN/total:0,size:46}),
@@ -2015,7 +2048,21 @@ function BriefView({T,brief,onBrief,toastFn}){
           :edit.kind==='telegram'?'Public channel only (t.me/<name> or @name). The brief shows its new posts.'
           :edit.kind==='rss'?'Any RSS/Atom feed — a news site, blog, Substack, subreddit (.../.rss), or an X/Instagram bridge URL.'
           :'A site or app shortcut — opens in your browser. Use this for accounts with no public feed (Instagram, X, WhatsApp).'),
-        h('button',{onClick:()=>saveItem(edit),disabled:busy,className:'act96',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:8,width:'100%',padding:'13px',borderRadius:11,background:T.fg,color:T.bg,fontSize:15,fontWeight:600,opacity:busy?.6:1}},busy?h(Spinner,{T,size:15}):null,busy?'Fetching…':(edit.id?'Save':'Add')))):null);
+        h('button',{onClick:()=>saveItem(edit),disabled:busy,className:'act96',style:{display:'flex',alignItems:'center',justifyContent:'center',gap:8,width:'100%',padding:'13px',borderRadius:11,background:T.fg,color:T.bg,fontSize:15,fontWeight:600,opacity:busy?.6:1}},busy?h(Spinner,{T,size:15}):null,busy?'Fetching…':(edit.id?'Save':'Add')))):null,
+
+    logOpen?h(Sheet,{T,title:'Brief history',onClose:()=>setLogOpen(false)},
+      briefLog.length===0
+        ?h('div',{style:{padding:'28px 20px',color:T.sub,fontSize:14,textAlign:'center',lineHeight:1.6}},'No history yet. When a brief window closes with unread updates, they are saved here automatically for 14 days.')
+        :h('div',{style:{paddingBottom:'calc(18px + '+SAFE_B+')'}},
+          briefLog.map(entry=>h('div',{key:entry.id,style:{borderBottom:'1px solid '+T.hair}},
+            h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'12px 18px 6px'}},
+              h('div',{style:{flex:1,fontSize:13.5,fontWeight:700,color:T.fg}},entry.slotName+' · '+fmtLogDate(entry.snapshotAt)),
+              h('span',{style:{fontSize:11.5,fontWeight:600,color:'#fff',background:'#d4564a',borderRadius:999,padding:'2px 8px'}},entry.items.reduce((n,i)=>n+i.entries.length,0)+' missed')),
+            entry.items.map(it=>h('div',{key:it.id,style:{padding:'2px 18px 10px'}},
+              h('div',{style:{fontSize:11.5,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:T.sub,marginBottom:4}},it.name+(it.groupName?' · '+it.groupName:'')),
+              it.entries.map(e=>h('div',{key:e.url||e.publishedMs,onClick:()=>openExternalUrl(e.url),style:{display:'flex',gap:10,padding:'5px 0',cursor:'pointer',alignItems:'flex-start'}},
+                h('span',{style:{fontSize:11,color:T.meta,flexShrink:0,paddingTop:2}},new Date(e.publishedMs).toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'})),
+                h('span',{style:{fontSize:13,color:T.fg,flex:1,lineHeight:1.4}},(e.title||'(no title)').slice(0,150)))))))))):null);
 }
 
 function NotesList({T,articles,onOpenArticle,onOpenHighlight}){
