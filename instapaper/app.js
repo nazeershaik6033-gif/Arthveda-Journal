@@ -728,12 +728,54 @@ async function fetchYouTubeMeta(url,id){
   return{title,author,image:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg'};
 }
 
+/* ---- social posts (X / Instagram / Telegram) saved as link cards ---- */
+const PLATFORM_LABEL={x:'X',instagram:'Instagram',telegram:'Telegram'};
+function socialOf(url){
+  const u=String(url||'');
+  let m;
+  if(m=u.match(/(?:^|\/\/)(?:www\.)?(?:x\.com|twitter\.com|nitter\.[^/]+)\/([A-Za-z0-9_]{1,15})\b/i)){
+    const h=m[1]; if(/^(home|search|explore|i|messages|notifications|settings|hashtag)$/i.test(h))return{platform:'x',handle:''}; return{platform:'x',handle:h};
+  }
+  if(/instagram\.com\/(?:p|reel|reels|tv)\//i.test(u))return{platform:'instagram',handle:''};
+  if(m=u.match(/instagram\.com\/([A-Za-z0-9_.]{1,40})\/?(?:\?|$)/i))return{platform:'instagram',handle:m[1]};
+  if(m=u.match(/(?:t\.me|telegram\.me)\/(?:s\/)?([A-Za-z0-9_]{3,})/i)){
+    if(/^(joinchat|s|share|proxy|addstickers)$/i.test(m[1]))return{platform:'telegram',handle:''}; return{platform:'telegram',handle:m[1]};
+  }
+  return null;
+}
+// Best-effort Open Graph metadata for a social link; degrades to an empty card.
+async function fetchSocialMeta(url){
+  try{
+    const raw=await fetchRawHtml(url);
+    const doc=new DOMParser().parseFromString(raw,'text/html');
+    const meta=sel=>{const el=doc.querySelector(sel);return el?(el.getAttribute('content')||'').trim():''};
+    return{
+      title:meta('meta[property="og:title"]')||meta('meta[name="twitter:title"]')||'',
+      image:safeUrl(absUrl(meta('meta[property="og:image"]')||meta('meta[name="twitter:image"]')||'',url)),
+      desc:meta('meta[property="og:description"]')||meta('meta[name="twitter:description"]')||meta('meta[name="description"]')||''
+    };
+  }catch(e){return{title:'',image:'',desc:''}}
+}
+
 /* returns a full article record (without id/folder) */
 async function fetchArticleData(url){
   const vid=ytIdOf(url);
   if(vid){
     const m=await fetchYouTubeMeta(url,vid);
     return{url,title:m.title,source:'YouTube',author:m.author,image:m.image,html:'',text:'',excerpt:m.author?('Video by '+m.author):'Saved video',words:0,readMin:0,isVideo:true,videoId:vid,publishedAt:0};
+  }
+  const soc=socialOf(url);
+  if(soc){
+    const label=PLATFORM_LABEL[soc.platform]||'Post';
+    const handle=soc.handle?('@'+soc.handle):'';
+    const m=await fetchSocialMeta(url);
+    return{url,
+      title:(m.title||(handle?handle+' on '+label:label+' post')).trim(),
+      source:label,author:handle,
+      image:m.image||'',html:'',text:'',
+      excerpt:(m.desc||'').slice(0,220).trim(),
+      words:0,readMin:0,isVideo:false,videoId:null,
+      isPost:true,platform:soc.platform,publishedAt:0};
   }
   let res=null,err1=null;
   try{res=await fetchViaJina(url)}catch(e){err1=e}
@@ -1000,7 +1042,8 @@ function ArticleRow({a,T,scopeType,onOpen,onLongPress,onSwipeLeft,onSwipeRight,s
   const prog=a.progress||0;
   const done=prog>=0.97;
   let footer;
-  if(a.isVideo)footer=done?'Watched':'Video';
+  if(a.isPost)footer='Open post';
+  else if(a.isVideo)footer=done?'Watched':'Video';
   else if(done)footer='Completed';
   else if(prog>0.01)footer=Math.round(prog*100)+'% · '+a.readMin+' min read';
   else footer=a.words?a.readMin+' min read':'Saved link';
@@ -2717,7 +2760,8 @@ function App(){
   const [voices,setVoices]=useState([]);
   const [aiOpen,setAiOpen]=useState(null); // {articleId?} — header AI works on any page
   const [browserO,setBrowserO]=useState(null); // {url} — in-app browser
-  const [filterMenu,setFilterMenu]=useState(false); // reader list filter dropdown
+  const [filterMenu,setFilterMenu]=useState(false); // reader list type-filter dropdown
+  const [sortMenu,setSortMenu]=useState(false); // reader list sort dropdown
   const [media,setMedia]=useState([]); // {id,kind,mime,name,caption,albumId,favorite,pinned,addedAt,blob}
   const [albums,setAlbums]=useState([]); // {id,name,createdAt}
   const fileInputRef=useRef(null); // hidden <input> reused for take-photo / library / files
@@ -2882,7 +2926,7 @@ function App(){
     const article=Object.assign(rec,{id:uid(),addedAt:Date.now(),liked:false,archived:false,folderId:folderId||null,tags:[],progress:0,opens:0,highlights:[]});
     update(d=>({...d,articles:[article,...d.articles]}));
     setAddS(null);
-    toastFn(article.isVideo?'Video saved':'Saved — '+article.readMin+' min read');
+    toastFn(article.isPost?(article.source+' post saved'):article.isVideo?'Video saved':'Saved — '+article.readMin+' min read');
   };
   const saveStub=(url,folderId)=>{
     if(!url)return;
@@ -2906,7 +2950,7 @@ function App(){
     if(st.queue.some(id=>ids.includes(id)))ttsStop();
     setSheet(null);setSelecting(null);toastFn('Deleted');
   };
-  const openArticle=id=>{patchArticle(id,a=>({opens:(a.opens||0)+1}));setReadingId(id)};
+  const openArticle=id=>{const a=byId(id);patchArticle(id,x=>({opens:(x.opens||0)+1}));if(a&&a.isPost){if(a.url)openExternalUrl(a.url);return}setReadingId(id)};
   const doAction=(id,key)=>{
     const a=byId(id);if(!a&&key!=='close')return;
     switch(key){
@@ -3033,8 +3077,9 @@ function App(){
     else{
       arr=data.articles.filter(a=>inScope(a,scope));
       // Type and read-status are independent filters.
-      if(S.typeFilter==='article')arr=arr.filter(a=>!a.isVideo);
+      if(S.typeFilter==='article')arr=arr.filter(a=>!a.isVideo&&!a.isPost);
       else if(S.typeFilter==='video')arr=arr.filter(a=>a.isVideo);
+      else if(S.typeFilter==='post')arr=arr.filter(a=>a.isPost);
       if(S.readFilter==='unread')arr=arr.filter(a=>(a.progress||0)<0.97);
       else if(S.readFilter==='read')arr=arr.filter(a=>(a.progress||0)>=0.97);
     }
@@ -3121,18 +3166,28 @@ function App(){
           query?h('button',{onClick:()=>setQuery(''),className:'act90',style:{color:T.sub,display:'flex',padding:2}},Icons.x(16)):null),
         (!q&&scope.type!=='archive')?(()=>{const chip=on=>({display:'flex',alignItems:'center',gap:5,fontSize:12.5,fontWeight:600,color:on?T.accent:T.sub,background:on?T.card:'transparent',border:'1px solid '+(on?T.accent:T.hair),borderRadius:999,padding:'5px 11px',cursor:'pointer',whiteSpace:'nowrap'});
           const setS=patch=>update(d=>({...d,settings:{...d.settings,...patch}}));
-          const TYPES=[['all','All'],['article','Article'],['video','Video']];
+          const TYPES=[['all','All'],['article','Article'],['video','Video'],['post','Post']];
           const curType=(TYPES.find(t=>t[0]===S.typeFilter)||TYPES[0])[1];
+          const curSort=(SORTS.find(s=>s[0]===S.sort)||SORTS[0])[1];
           return h('div',{style:{display:'flex',alignItems:'center',gap:8,marginTop:8,flexWrap:'wrap'}},
             h('div',{style:{position:'relative'}},
-              h('button',{onClick:()=>setFilterMenu(v=>!v),className:'act90',style:chip(S.typeFilter!=='all')},Icons.filter(14),curType,Icons.chevD?Icons.chevD(13):null),
+              h('button',{onClick:()=>{setSortMenu(false);setFilterMenu(v=>!v)},className:'act90',style:chip(S.typeFilter!=='all')},Icons.filter(14),curType,Icons.chevD?Icons.chevD(13):null),
               filterMenu?h(Fragment,null,
                 h('div',{onClick:()=>setFilterMenu(false),style:{position:'fixed',inset:0,zIndex:29}}),
                 h('div',{className:'fdin',style:{position:'absolute',top:'calc(100% + 6px)',left:0,zIndex:30,background:T.menuBg,border:'1px solid '+T.menuHair,borderRadius:12,overflow:'hidden',minWidth:170,boxShadow:'0 12px 36px rgba(0,0,0,.45)'}},
                   TYPES.map(([v,l])=>h('button',{key:v,onClick:()=>{setS({typeFilter:v});setFilterMenu(false)},className:'act98',
                     style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,width:'100%',padding:'11px 15px',color:T.menuFg,fontSize:14.5,fontWeight:v===S.typeFilter?600:400,background:'transparent',textAlign:'left'}},
                     l,v===S.typeFilter?h('span',{style:{display:'flex',color:T.accent}},Icons.check(16)):null)))):null),
-            h('button',{onClick:()=>setS({readFilter:S.readFilter==='read'?'unread':'read'}),className:'act90',style:chip(true),title:'Toggle read / unread'},S.readFilter==='read'?'Read':'Unread'));
+            h('button',{onClick:()=>setS({readFilter:S.readFilter==='read'?'unread':'read'}),className:'act90',style:chip(true),title:'Toggle read / unread'},S.readFilter==='read'?'Read':'Unread'),
+            h('div',{style:{flex:1,minWidth:6}}),
+            h('div',{style:{position:'relative'}},
+              h('button',{onClick:()=>{setFilterMenu(false);setSortMenu(v=>!v)},className:'act90',style:chip(true),title:'Sort'},Icons.sort(14),curSort,Icons.chevD?Icons.chevD(13):null),
+              sortMenu?h(Fragment,null,
+                h('div',{onClick:()=>setSortMenu(false),style:{position:'fixed',inset:0,zIndex:29}}),
+                h('div',{className:'fdin',style:{position:'absolute',top:'calc(100% + 6px)',right:0,zIndex:30,background:T.menuBg,border:'1px solid '+T.menuHair,borderRadius:12,overflow:'hidden',minWidth:180,boxShadow:'0 12px 36px rgba(0,0,0,.45)'}},
+                  SORTS.map(([v,l])=>h('button',{key:v,onClick:()=>{setS({sort:v});setSortMenu(false)},className:'act98',
+                    style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,width:'100%',padding:'11px 15px',color:T.menuFg,fontSize:14.5,fontWeight:v===S.sort?600:400,background:'transparent',textAlign:'left'}},
+                    l,v===S.sort?h('span',{style:{display:'flex',color:T.accent}},Icons.check(16)):null)))):null));
         })():null):null,
       h('div',{ref:listScrollRef,className:'sy',style:{flex:1,overflowY:'auto',WebkitOverflowScrolling:'touch',paddingBottom:ttsUI?100:16}},body),
       selecting?h('div',{style:{flexShrink:0,borderTop:'1px solid '+T.hair,background:T.bg,paddingBottom:SAFE_B}},
