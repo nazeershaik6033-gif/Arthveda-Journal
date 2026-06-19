@@ -576,7 +576,6 @@ body.reader-active { overflow: hidden; }
 body.reader-active .header,
 body.reader-active .market-banner,
 body.reader-active .bottom-dock,
-body.reader-active #fabBtn,
 body.reader-active .drawer,
 body.reader-active .drawer-overlay { display: none !important; }
 body.reader-active .container { max-width: none; padding: 0; margin: 0; }
@@ -1913,11 +1912,6 @@ table.data-table tr:last-child td { border-bottom: none; }
   <div class="tab-panel" id="panel-settings"></div>
 </main>
 
-<!-- FLOATING ACTION BUTTON -->
-<button class="fab" id="fabBtn" title="New Trade" aria-label="Add new trade">
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-</button>
-
 <!-- BOTTOM DOCK -->
 <nav class="bottom-dock" id="bottomDock"></nav>
 
@@ -2436,9 +2430,6 @@ function switchTab(tabId) {
   document.querySelectorAll('.drawer-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   // Header brand stays static ("NazTrades") — title no longer changes per tab
   closeHeaderMenu();
-  // Hide the FAB while on the entry screen (it's redundant there)
-  const fab = document.getElementById('fabBtn');
-  if (fab) fab.style.display = (tabId === 'entry' || tabId === 'reader') ? 'none' : 'flex';
   // Reader runs standalone full-screen: hide the journal's header, banner and
   // dock so Instapaper takes over the whole viewport.
   document.body.classList.toggle('reader-active', tabId === 'reader');
@@ -7577,7 +7568,9 @@ async function init() {
   // which reloads this PWA); fall back to the Dashboard.
   let savedNav = null;
   try { savedNav = JSON.parse(localStorage.getItem('naz_nav_v1') || 'null'); } catch (e) {}
-  const validTab = savedNav && savedNav.tab && TABS.some(t => t.id === savedNav.tab);
+  // Restore the last tab, but never auto-open the Reader (Instapaper) on launch —
+  // always land on Naz Trades' home instead.
+  const validTab = savedNav && savedNav.tab && savedNav.tab !== 'reader' && TABS.some(t => t.id === savedNav.tab);
   if (validTab) {
     if (savedNav.subTrades) activeSubTab.trades = savedNav.subTrades;
     switchTab(savedNav.tab);
@@ -7594,7 +7587,6 @@ async function init() {
   document.getElementById('menuBtn').onclick = openDrawer;
   document.getElementById('drawerCloseBtn').onclick = closeDrawer;
   document.getElementById('drawerOverlay').onclick = closeDrawer;
-  document.getElementById('fabBtn').onclick = () => switchTab('entry');
   document.getElementById('aiBtn').onclick = onAiClick;
   document.getElementById('readerArrowBtn').onclick = () => switchTab('reader');
   // Close the header dropdown when clicking anywhere outside it
