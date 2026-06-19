@@ -1877,7 +1877,7 @@ table.data-table tr:last-child td { border-bottom: none; }
 .home-sec:first-child { margin-top: 0; }
 .home-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; cursor: pointer; user-select: none; }
 .home-sec-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.home-sec-chevron { display: inline-block; transition: transform .18s ease; color: var(--text-muted); font-size: 12px; }
+.home-sec-chevron { display: inline-flex; align-items: center; transition: transform .2s cubic-bezier(.4,0,.2,1); color: var(--text-muted); }
 .home-sec-chevron.open { transform: rotate(90deg); }
 .home-sec-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .home-sec-body { padding: 0 16px 16px; }
@@ -2963,7 +2963,7 @@ function homeSection(key, title, bodyHTML, actionsHTML, isOpen) {
     <div class="home-sec card" data-sec="${key}">
       <div class="home-sec-head" onclick="toggleHomeSection('${key}')">
         <div class="home-sec-title">
-          <span class="home-sec-chevron ${open ? 'open' : ''}">▸</span>
+          <span class="home-sec-chevron ${open ? 'open' : ''}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></span>
           <h3 class="card-title" style="margin:0;">${title}</h3>
         </div>
         <div class="home-sec-actions">${actionsHTML || ''}</div>
