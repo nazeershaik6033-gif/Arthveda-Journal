@@ -1047,24 +1047,40 @@ function FolderItem({T,folder,active,onClick,onLongPress}){
     h('span',{style:{fontSize:16.5,fontWeight:active?650:400,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},folder.name));
 }
 
-function Sidebar({T,scope,folders,onScope,onClose,onFolderLongPress,onBrowse}){
+function Sidebar({T,scope,folders,onScope,onClose,onFolderLongPress,onBrowse,onSettings}){
   const is=(t,id)=>scope.type===t&&(id===undefined||scope.id===id);
   const go=(t,id)=>{onScope({type:t,id});onClose()};
+  const [q,setQ]=useState('');
+  const m=s=>!q.trim()||(s||'').toLowerCase().includes(q.trim().toLowerCase());
+  const NAV=[
+    {key:'home',icon:Icons.home(22),label:'Home',active:is('home'),onClick:()=>go('home')},
+    {key:'liked',icon:Icons.heart(22),label:'Liked',active:is('liked'),onClick:()=>go('liked')},
+    {key:'archive',icon:Icons.archive(22),label:'Archive',active:is('archive'),onClick:()=>go('archive')},
+    {key:'photos',icon:Icons.image(22),label:'Photos',active:is('photos'),onClick:()=>go('photos')},
+    {key:'brief',icon:Icons.sun(22),label:'Daily Brief',active:is('brief'),onClick:()=>go('brief')},
+    {key:'notes',icon:Icons.notes(22),label:'Notes',active:is('notes'),onClick:()=>go('notes')},
+    {key:'tags',icon:Icons.tag(22),label:'Tags',active:is('tags'),onClick:()=>go('tags')},
+    {key:'browse',icon:Icons.globe(22),label:'Browse',active:false,onClick:()=>{onClose();onBrowse()}},
+    {key:'settings',icon:Icons.gear(22),label:'Settings',active:false,onClick:()=>{onClose();onSettings()}}
+  ];
+  const navF=NAV.filter(n=>m(n.label));
+  const foldersF=folders.filter(f=>m(f.name));
+  const noMatch=q.trim()&&!navF.length&&!foldersF.length;
   return h('div',{style:{position:'fixed',inset:0,zIndex:60}},
     h('div',{onClick:onClose,className:'fdin',style:{position:'absolute',inset:0,background:T.overlay}}),
     h('div',{className:'slid',style:{position:'absolute',top:0,bottom:0,left:0,width:'min(82vw, 330px)',background:T.bg,color:T.fg,display:'flex',flexDirection:'column',boxShadow:'8px 0 40px rgba(0,0,0,.25)'}},
-      h('div',{style:{paddingTop:'calc(8px + '+SAFE_T+')',flexShrink:0,display:'flex',alignItems:'center',padding:'calc(8px + '+SAFE_T+') 10px 6px'}},
+      h('div',{style:{flexShrink:0,display:'flex',alignItems:'center',padding:'calc(8px + '+SAFE_T+') 10px 6px'}},
         h('button',{onClick:onClose,className:'act90',style:Object.assign({},iconBtnS,{color:T.fg})},Icons.menu(24))),
+      h('div',{style:{flexShrink:0,padding:'2px 14px 8px'}},
+        h('div',{style:{display:'flex',alignItems:'center',gap:9,background:T.search,borderRadius:11,padding:'9px 12px'}},
+          h('span',{style:{color:T.sub,display:'flex'}},Icons.search(17)),
+          h('input',{value:q,onChange:e=>setQ(e.target.value),placeholder:'Search menu',autoCapitalize:'none',autoCorrect:'off',
+            style:{flex:1,border:'none',background:'transparent',color:T.fg,fontSize:15.5,minWidth:0}}),
+          q?h('button',{onClick:()=>setQ(''),className:'act90',style:{color:T.sub,display:'flex',padding:2}},Icons.x(16)):null)),
       h('div',{className:'sy',style:{flex:1,overflowY:'auto'}},
-        h(SidebarItem,{T,icon:Icons.home(22),label:'Home',active:is('home'),onClick:()=>go('home')}),
-        h(SidebarItem,{T,icon:Icons.heart(22),label:'Liked',active:is('liked'),onClick:()=>go('liked')}),
-        h(SidebarItem,{T,icon:Icons.archive(22),label:'Archive',active:is('archive'),onClick:()=>go('archive')}),
-        h(SidebarItem,{T,icon:Icons.image(22),label:'Photos',active:is('photos'),onClick:()=>go('photos')}),
-        h(SidebarItem,{T,icon:Icons.sun(22),label:'Daily Brief',active:is('brief'),onClick:()=>go('brief')}),
-        h(SidebarItem,{T,icon:Icons.notes(22),label:'Notes',active:is('notes'),onClick:()=>go('notes')}),
-        h(SidebarItem,{T,icon:Icons.tag(22),label:'Tags',active:is('tags'),onClick:()=>go('tags')}),
-        h(SidebarItem,{T,icon:Icons.globe(22),label:'Browse',active:false,onClick:()=>{onClose();onBrowse()}}),
-        folders.map(f=>h(FolderItem,{key:f.id,T,folder:f,active:is('folder',f.id),onClick:()=>go('folder',f.id),onLongPress:()=>onFolderLongPress(f)})),
+        navF.map(n=>h(SidebarItem,{key:n.key,T,icon:n.icon,label:n.label,active:n.active,onClick:n.onClick})),
+        foldersF.map(f=>h(FolderItem,{key:f.id,T,folder:f,active:is('folder',f.id),onClick:()=>go('folder',f.id),onLongPress:()=>onFolderLongPress(f)})),
+        noMatch?h('div',{style:{padding:'18px 22px',color:T.sub,fontSize:14}},'No matches'):null,
         h('div',{style:{height:'calc(20px + '+SAFE_B+')'}})
       )
     ));
@@ -1830,6 +1846,9 @@ function BriefView({T,brief,onBrief,toastFn}){
   const [gName,setGName]=useState('');
   const [busy,setBusy]=useState(false);
   const [slotSheet,setSlotSheet]=useState(false);
+  // Per-group collapse for the brief; persisted so it survives reloads.
+  const [collapsed,setCollapsed]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem('insta_brief_collapsed')||'[]'))}catch(e){return new Set()}});
+  const toggleCollapse=key=>setCollapsed(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);try{localStorage.setItem('insta_brief_collapsed',JSON.stringify([...n]))}catch(e){}return n});
   useEffect(()=>{ // best-effort refresh of each feed's recent items
     let live=true;
     (async()=>{for(const it of items){
@@ -1872,11 +1891,12 @@ function BriefView({T,brief,onBrief,toastFn}){
   const ungrouped=items.filter(i=>!i.groupId||!groups.some(g=>g.id===i.groupId));
   if(ungrouped.length)sections.push({g:null,list:ungrouped});
   const itemRow=it=>h(BriefItem,{key:it.id,T,item:it,feedy:hasFeed(it),entries:win.future?[]:newEntries(it),done:doneIds.includes(it.id),onToggle:()=>toggle(it.id),onOpen:()=>open(it),onEntry:openEntry,onLongPress:()=>setAct(it)});
-  const sectionHead=(g,list)=>h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'14px 4px 4px'}},
-    h('div',{style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},(g?g.name:'Other')+' · '+list.filter(i=>doneIds.includes(i.id)).length+'/'+list.length),
+  const sectionHead=(g,list)=>{const key=g?g.id:'_other';const isOpen=!collapsed.has(key);return h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'14px 4px 4px'}},
+    h('button',{onClick:()=>toggleCollapse(key),className:'act90','aria-label':isOpen?'Collapse group':'Expand group',style:{display:'flex',color:T.sub,padding:3,transform:isOpen?'rotate(90deg)':'none',transition:'transform 160ms'}},Icons.chevR(15)),
+    h('div',{onClick:()=>toggleCollapse(key),style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}},(g?g.name:'Other')+' · '+list.filter(i=>doneIds.includes(i.id)).length+'/'+list.length),
     g?h('button',{onClick:()=>{setGName(g.name);setGrp({rename:g.id})},className:'act90',style:{display:'flex',color:T.sub,padding:3}},Icons.pencil(16)):null,
     g?h('button',{onClick:()=>{onBrief(b=>({...b,items:b.items.map(i=>i.groupId===g.id?{...i,groupId:null}:i),groups:b.groups.filter(x=>x.id!==g.id)}))},className:'act90',style:{display:'flex',color:T.danger,padding:3}},Icons.trash(16)):null,
-    h('button',{onClick:()=>setEdit({groupId:g?g.id:null,kind:'link',name:'',url:''}),className:'act90',style:{display:'flex',color:T.accent,padding:3}},Icons.plus(18)));
+    h('button',{onClick:()=>setEdit({groupId:g?g.id:null,kind:'link',name:'',url:''}),className:'act90',style:{display:'flex',color:T.accent,padding:3}},Icons.plus(18)));};
 
   return h('div',null,
     h('div',{className:'sx',style:{display:'flex',gap:7,overflowX:'auto',padding:'8px 14px 2px'}},
@@ -1894,7 +1914,7 @@ function BriefView({T,brief,onBrief,toastFn}){
       newCount?h('span',{style:{flexShrink:0,fontSize:11,fontWeight:700,color:'#fff',background:'#d4564a',borderRadius:999,padding:'3px 9px'}},newCount+' new'):null),
     h('div',{style:{padding:'2px 14px 0'}},
       win.future?h('div',{style:{fontSize:12.5,color:T.sub,background:T.card,borderRadius:10,padding:'10px 12px',margin:'6px 2px',lineHeight:1.45}},'This brief begins at '+fmtClock(curSlot.time)+'. New videos since your last brief will appear here then.'):null,
-      total?sections.map(({g,list})=>h('div',{key:g?g.id:'_other'},sectionHead(g,list),list.length?list.map(itemRow):h('div',{style:{fontSize:12.5,color:T.sub,padding:'6px 4px 10px'}},'Nothing here yet — tap + to add.')))
+      total?sections.map(({g,list})=>h('div',{key:g?g.id:'_other'},sectionHead(g,list),collapsed.has(g?g.id:'_other')?null:(list.length?list.map(itemRow):h('div',{style:{fontSize:12.5,color:T.sub,padding:'6px 4px 10px'}},'Nothing here yet — tap + to add.'))))
         :h(EmptyState,{T,icon:Icons.sun(40),title:'Your daily brief',sub:'Group the social apps, websites and YouTube channels you go through each day, then check them off.'}),
       h('button',{onClick:()=>{setGName('');setGrp({})},className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:18,padding:'11px 14px',borderRadius:11,border:'1px dashed '+T.hair,color:T.fg,fontSize:14,fontWeight:500}},Icons.plus(18),'New group'),
       h('button',{onClick:()=>setEdit({groupId:groups[0]?groups[0].id:null,kind:'link',name:'',url:''}),className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:10,padding:'11px 14px',borderRadius:11,background:T.card,color:T.fg,fontSize:14,fontWeight:600}},Icons.plus(18),'Add item'),
@@ -3063,7 +3083,6 @@ function App(){
       headerBtn(Icons.sun(22),()=>{setScope({type:'brief'});setQuery('')}),
       headerBtn(Icons.contrast(22),cycleTheme),
       headerBtn(Icons.globe(22),()=>setBrowserO({url:''})),
-      headerBtn(Icons.dots(22),()=>setMenuOpen(true)),
       EMBEDDED?headerBtn(Icons.back(23),exitToHost):null);
   }
 
@@ -3135,6 +3154,7 @@ function App(){
 
     sidebar?h(Sidebar,{T,scope,folders:data.folders,onScope:s=>{setScope(s);setQuery('');setSelecting(null)},onClose:()=>setSidebar(false),
       onBrowse:()=>setBrowserO({url:''}),
+      onSettings:()=>setSettingsOpen(true),
       onFolderLongPress:f=>{setSidebar(false);setSheet({type:'folder',folder:f})}}):null,
 
     menuOpen?h(MenuPopover,{T,settings:S,showListOps:isArticleScope,onClose:()=>setMenuOpen(false),

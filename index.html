@@ -4806,17 +4806,17 @@ function watchlistBodyHTML(containerId) {
   const active = state.watchlists.find(w => w.id === activeSubTab.wl);
   const cid = containerId || 'wlCards';
   return `
+    <div class="btn-row" style="margin-bottom: 12px;">
+      <button class="btn btn-sm" onclick="addWatchlistSymbolPrompt()">+ Add Symbol</button>
+      <button class="btn btn-ghost btn-sm" onclick="renameWatchlistPrompt('${active.id}')">Rename</button>
+      ${state.watchlists.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteWatchlistPrompt('${active.id}')">Delete List</button>` : ''}
+    </div>
     <div class="wl-tabs">
       ${state.watchlists.map(w => `
         <div class="wl-tab ${w.id === active.id ? 'active' : ''}" onclick="setSubTab('wl','${w.id}')">
           ${escapeHtml(w.name)} <span style="opacity: 0.6;">(${w.symbols.length})</span>
         </div>
       `).join('')}
-    </div>
-    <div class="btn-row" style="margin-bottom: 12px;">
-      <button class="btn btn-sm" onclick="addWatchlistSymbolPrompt()">+ Add Symbol</button>
-      <button class="btn btn-ghost btn-sm" onclick="renameWatchlistPrompt('${active.id}')">Rename</button>
-      ${state.watchlists.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteWatchlistPrompt('${active.id}')">Delete List</button>` : ''}
     </div>
     ${active.symbols.length ? `<div id="${cid}">${wlOrderedSymbols(active.symbols).map(s => wlCardHTML(active, s)).join('')}</div>` : `
       <div class="empty-state" style="padding:24px 0;">
