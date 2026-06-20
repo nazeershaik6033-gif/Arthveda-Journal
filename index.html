@@ -1905,6 +1905,7 @@ table.data-table tr:last-child td { border-bottom: none; }
 .news-item-title { flex: 1; font-size: 12.5px; line-height: 1.35; color: var(--text); }
 .news-item-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 .news-tag { font-size: 9px; font-weight: 700; letter-spacing: .04em; color: var(--accent, #6c6cf5); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; flex-shrink: 0; align-self: center; }
+.news-src { font-size: 9px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--text-muted); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0 4px; flex-shrink: 0; align-self: center; white-space: nowrap; }
 .news-empty { font-size: 12px; color: var(--text-muted); padding: 6px 0; }
 .news-more { display: inline-block; margin-top: 6px; font-size: 11.5px; color: var(--accent, #6c6cf5); text-decoration: none; }
 /* Current Holdings summary + sub-sections */
@@ -3093,9 +3094,28 @@ function parseRssItems(xml, max) {
   } catch (e) {}
   return items;
 }
-async function fetchPulseNews() {
-  const xml = await newsFetchText('https://pulse.zerodha.com/feed.php');
-  return parseRssItems(xml, 8).map(i => ({ ...i, kind: 'news' }));
+// Market News aggregates several Indian market RSS feeds into one timeline.
+// Any feed that fails just contributes nothing, so the rest still populate.
+const MARKET_FEEDS = [
+  { src: 'Pulse',        url: 'https://pulse.zerodha.com/feed.php' },
+  { src: 'Moneycontrol', url: 'https://www.moneycontrol.com/rss/marketreports.xml' },
+  { src: 'ET Markets',   url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms' },
+  { src: 'Mint',         url: 'https://www.livemint.com/rss/markets' },
+  { src: 'NDTV Profit',  url: 'https://feeds.feedburner.com/ndtvprofit-latest' }
+];
+async function fetchMarketNews() {
+  const results = await Promise.allSettled(
+    MARKET_FEEDS.map(f => newsFetchText(f.url, 8000).then(xml => ({ f, xml })))
+  );
+  const out = [];
+  results.forEach(r => {
+    if (r.status !== 'fulfilled' || !r.value.xml) return;
+    parseRssItems(r.value.xml, 8).forEach(i => out.push({ ...i, kind: 'news', source: r.value.f.src }));
+  });
+  const seen = new Set(), merged = [];
+  out.sort((a, b) => (b.date || 0) - (a.date || 0));
+  for (const it of out) { const k = it.title.toLowerCase().slice(0, 60); if (seen.has(k)) continue; seen.add(k); merged.push(it); }
+  return merged.slice(0, 14);
 }
 async function fetchSymbolNews(sym) {
   const out = [];
@@ -3123,7 +3143,7 @@ async function fetchSymbolNews(sym) {
   for (const it of out) { const k = it.title.toLowerCase().slice(0, 60); if (seen.has(k)) continue; seen.add(k); merged.push(it); }
   return merged.slice(0, 6);
 }
-async function fetchNewsFor(key) { return key === '__pulse' ? fetchPulseNews() : fetchSymbolNews(key); }
+async function fetchNewsFor(key) { return key === '__pulse' ? fetchMarketNews() : fetchSymbolNews(key); }
 
 function newsFooter(key) {
   return key === '__pulse'
@@ -3134,7 +3154,7 @@ function newsItemsHTML(key, items) {
   if (!items || !items.length) return `<div class="news-empty">No recent items.</div>` + newsFooter(key);
   const rows = items.map(i => `
     <a class="news-item" href="${escapeHtml(i.url || '#')}" target="_blank" rel="noopener">
-      ${i.kind === 'filing' ? '<span class="news-tag">FILING</span>' : ''}
+      ${i.kind === 'filing' ? '<span class="news-tag">FILING</span>' : (i.source ? `<span class="news-src">${escapeHtml(i.source)}</span>` : '')}
       <span class="news-item-title">${escapeHtml(i.title)}</span>
       ${i.date ? `<span class="news-item-time">${newsTimeAgo(i.date)}</span>` : ''}
     </a>`).join('');
@@ -3180,7 +3200,7 @@ function newsSubHTML(renderKey, label, cacheKey) {
 }
 function newsBodyHTML() {
   const cats = newsCategories();
-  let html = newsSubHTML('__pulse', 'Market News · Pulse', '__pulse');
+  let html = newsSubHTML('__pulse', 'Market News', '__pulse');
   if (cats.length) {
     cats.forEach(c => {
       html += `<div class="holdings-subhead">${escapeHtml(c.label)} <span class="hs-count">${c.symbols.length}</span></div>`;
