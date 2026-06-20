@@ -1908,6 +1908,8 @@ table.data-table tr:last-child td { border-bottom: none; }
 .news-src { font-size: 9px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--text-muted); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0 4px; flex-shrink: 0; align-self: center; white-space: nowrap; }
 .news-empty { font-size: 12px; color: var(--text-muted); padding: 6px 0; }
 .news-more { display: inline-block; margin-top: 6px; font-size: 11.5px; color: var(--accent, #6c6cf5); text-decoration: none; }
+.news-sources { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.news-sources .news-more { margin-top: 0; }
 /* Current Holdings summary + sub-sections */
 .holdings-summary { display: flex; gap: 18px; padding: 4px 0 12px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px; }
 .hs-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
@@ -3097,11 +3099,11 @@ function parseRssItems(xml, max) {
 // Market News aggregates several Indian market RSS feeds into one timeline.
 // Any feed that fails just contributes nothing, so the rest still populate.
 const MARKET_FEEDS = [
-  { src: 'Pulse',        url: 'https://pulse.zerodha.com/feed.php' },
-  { src: 'Moneycontrol', url: 'https://www.moneycontrol.com/rss/marketreports.xml' },
-  { src: 'ET Markets',   url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms' },
-  { src: 'Mint',         url: 'https://www.livemint.com/rss/markets' },
-  { src: 'NDTV Profit',  url: 'https://feeds.feedburner.com/ndtvprofit-latest' }
+  { src: 'Pulse',        url: 'https://pulse.zerodha.com/feed.php',                                        site: 'https://pulse.zerodha.com/' },
+  { src: 'Moneycontrol', url: 'https://www.moneycontrol.com/rss/marketreports.xml',                        site: 'https://www.moneycontrol.com/news/business/markets/' },
+  { src: 'ET Markets',   url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms',      site: 'https://economictimes.indiatimes.com/markets' },
+  { src: 'Mint',         url: 'https://www.livemint.com/rss/markets',                                      site: 'https://www.livemint.com/market' },
+  { src: 'NDTV Profit',  url: 'https://feeds.feedburner.com/ndtvprofit-latest',                            site: 'https://www.ndtvprofit.com/' }
 ];
 async function fetchMarketNews() {
   const results = await Promise.allSettled(
@@ -3146,9 +3148,11 @@ async function fetchSymbolNews(sym) {
 async function fetchNewsFor(key) { return key === '__pulse' ? fetchMarketNews() : fetchSymbolNews(key); }
 
 function newsFooter(key) {
-  return key === '__pulse'
-    ? `<a class="news-more" href="https://pulse.zerodha.com/" target="_blank" rel="noopener">Open Pulse ↗</a>`
-    : `<a class="news-more" href="https://www.screener.in/company/${encodeURIComponent(key)}/" target="_blank" rel="noopener">Filings on Screener ↗</a>`;
+  if (key === '__pulse') {
+    const links = MARKET_FEEDS.map(f => `<a class="news-more" href="${f.site}" target="_blank" rel="noopener">${escapeHtml(f.src)} ↗</a>`).join('');
+    return `<div class="news-sources">${links}</div>`;
+  }
+  return `<a class="news-more" href="https://www.screener.in/company/${encodeURIComponent(key)}/" target="_blank" rel="noopener">Filings on Screener ↗</a>`;
 }
 function newsItemsHTML(key, items) {
   if (!items || !items.length) return `<div class="news-empty">No recent items.</div>` + newsFooter(key);
