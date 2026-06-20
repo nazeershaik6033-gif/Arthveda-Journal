@@ -1881,6 +1881,23 @@ table.data-table tr:last-child td { border-bottom: none; }
 .home-sec-chevron.open { transform: rotate(90deg); }
 .home-sec-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .home-sec-body { padding: 0 16px 16px; }
+/* Home News section — collapsible per-symbol subsections */
+.news-list { display: flex; flex-direction: column; gap: 6px; }
+.news-sub { border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; }
+.news-sub-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; user-select: none; }
+.news-sub-chevron { display: inline-flex; align-items: center; transition: transform .2s cubic-bezier(.4,0,.2,1); color: var(--text-muted); flex-shrink: 0; }
+.news-sub-chevron.open { transform: rotate(90deg); }
+.news-sub-label { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-sub-spacer { flex: 1; }
+.news-sub-count { font-size: 11px; color: var(--text-muted); border: 1px solid var(--border-subtle); border-radius: 999px; padding: 1px 7px; flex-shrink: 0; }
+.news-sub-body { padding: 2px 12px 10px; }
+.news-item { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-top: 1px solid var(--border-subtle); text-decoration: none; }
+.news-item:first-child { border-top: none; }
+.news-item-title { flex: 1; font-size: 12.5px; line-height: 1.35; color: var(--text); }
+.news-item-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.news-tag { font-size: 9px; font-weight: 700; letter-spacing: .04em; color: var(--accent, #6c6cf5); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; flex-shrink: 0; align-self: center; }
+.news-empty { font-size: 12px; color: var(--text-muted); padding: 6px 0; }
+.news-more { display: inline-block; margin-top: 6px; font-size: 11.5px; color: var(--accent, #6c6cf5); text-decoration: none; }
 /* Current Holdings summary + sub-sections */
 .holdings-summary { display: flex; gap: 18px; padding: 4px 0 12px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px; }
 .hs-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
@@ -2992,8 +3009,185 @@ function renderDashboard() {
       `<button class="btn btn-sm" onclick="event.stopPropagation(); openPriorityModal()">+ Add Setup</button>`, sec.priority)}
     ${homeSection('watchlist', 'Watchlist', watchlistBodyHTML('wlCardsHome'),
       `<button class="btn btn-sm" onclick="event.stopPropagation(); addWatchlistSymbolPrompt()">+ Add Symbol</button>`, sec.watchlist)}
+    ${homeSection('news', 'News', newsBodyHTML(),
+      `<button class="btn btn-sm" onclick="event.stopPropagation(); refreshHomeNews()">↻ Refresh</button>`, sec.news)}
   `;
   initWatchlistDrag('wlCardsHome');
+  loadHomeNews();
+}
+
+/* ========================================================================
+   HOME NEWS — collapsible per-symbol news + filings, lazy + daily-cached.
+   Subsections come from current holdings, watchlist and priority symbols,
+   plus a general "Market News" feed (Pulse by Zerodha). Closed positions
+   drop off automatically because the symbol list is recomputed each render.
+   ======================================================================== */
+const NEWS_CACHE_KEY = 'naz_news_cache_v1';   // { key: { at, items:[{title,url,date,kind}] } }
+const NEWS_OPEN_KEY  = 'naz_news_open_v1';    // { key: true } -> expanded subsections
+const NEWS_TTL = 12 * 60 * 60 * 1000;         // refetch when older than ~12h
+function loadNewsCache() { try { return JSON.parse(localStorage.getItem(NEWS_CACHE_KEY)) || {}; } catch (e) { return {}; } }
+function saveNewsCache(c) { try { localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
+function loadNewsOpen() { try { return JSON.parse(localStorage.getItem(NEWS_OPEN_KEY)) || {}; } catch (e) { return {}; } }
+function saveNewsOpen(o) { try { localStorage.setItem(NEWS_OPEN_KEY, JSON.stringify(o)); } catch (e) {} }
+function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+
+// Unique symbols across core holdings, open satellite trades, watchlists, priority.
+function newsSymbols() {
+  const set = new Set();
+  (state.portfolio || []).forEach(p => p.symbol && set.add(p.symbol));
+  (state.trades || []).filter(t => t.status === 'open').forEach(t => t.symbol && set.add(t.symbol));
+  (state.watchlists || []).forEach(w => (w.symbols || []).forEach(s => s.symbol && set.add(s.symbol)));
+  (state.priority || []).forEach(p => p.symbol && set.add(p.symbol));
+  return [...set].map(s => String(s).trim().toUpperCase()).filter(Boolean).sort();
+}
+function newsTimeAgo(ts) {
+  if (!ts) return '';
+  const d = Math.max(0, Date.now() - ts), m = 60000, h = 3600000, day = 86400000;
+  if (d < h) return Math.max(1, Math.round(d / m)) + 'm';
+  if (d < day) return Math.round(d / h) + 'h';
+  const dd = Math.round(d / day);
+  return dd > 30 ? Math.round(dd / 30) + 'mo' : dd + 'd';
+}
+// Multi-proxy text fetch (same chain the TradingView import uses).
+async function newsFetchText(url) {
+  const proxies = [
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+    u => 'https://r.jina.ai/' + u
+  ];
+  for (const p of proxies) {
+    try { const res = await fetch(p(url)); if (res.ok) { const t = await res.text(); if (t && t.length > 60) return t; } } catch (e) {}
+  }
+  return '';
+}
+function parseRssItems(xml, max) {
+  const items = [];
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    let nodes = [...doc.getElementsByTagName('item')];
+    if (!nodes.length) nodes = [...doc.getElementsByTagName('entry')];
+    for (const n of nodes.slice(0, max || 8)) {
+      const tx = t => { const e = n.getElementsByTagName(t)[0]; return e ? (e.textContent || '').trim() : ''; };
+      let link = tx('link');
+      if (!link) { const l = n.getElementsByTagName('link')[0]; if (l) link = l.getAttribute('href') || ''; }
+      const title = tx('title');
+      if (!title) continue;
+      items.push({ title, url: link, date: Date.parse(tx('pubDate') || tx('published') || tx('updated')) || 0 });
+    }
+  } catch (e) {}
+  return items;
+}
+async function fetchPulseNews() {
+  const xml = await newsFetchText('https://pulse.zerodha.com/feed.php');
+  return parseRssItems(xml, 8).map(i => ({ ...i, kind: 'news' }));
+}
+async function fetchSymbolNews(sym) {
+  const out = [];
+  try { // Google News RSS (India, last 2 weeks) — reliable headlines incl. filing coverage.
+    const q = encodeURIComponent('"' + sym + '" stock');
+    const xml = await newsFetchText('https://news.google.com/rss/search?q=' + q + '+when:14d&hl=en-IN&gl=IN&ceid=IN:en');
+    parseRssItems(xml, 6).forEach(i => out.push({ ...i, kind: 'news' }));
+  } catch (e) {}
+  try { // Screener.in announcements = BSE/NSE exchange filings (best effort scrape).
+    const html = await newsFetchText('https://www.screener.in/company/' + encodeURIComponent(sym) + '/');
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const links = [...doc.querySelectorAll('a')].filter(a => /bseindia|nseindia|announcement|\.pdf/i.test(a.getAttribute('href') || ''));
+    links.slice(0, 6).forEach(a => {
+      const title = (a.textContent || '').replace(/\s+/g, ' ').trim();
+      if (title && title.length > 6) out.push({ title, url: a.href, date: 0, kind: 'filing' });
+    });
+  } catch (e) {}
+  const seen = new Set(), merged = [];
+  out.sort((a, b) => (b.date || 0) - (a.date || 0));
+  for (const it of out) { const k = it.title.toLowerCase().slice(0, 60); if (seen.has(k)) continue; seen.add(k); merged.push(it); }
+  return merged.slice(0, 6);
+}
+async function fetchNewsFor(key) { return key === '__pulse' ? fetchPulseNews() : fetchSymbolNews(key); }
+
+function newsFooter(key) {
+  return key === '__pulse'
+    ? `<a class="news-more" href="https://pulse.zerodha.com/" target="_blank" rel="noopener">Open Pulse ↗</a>`
+    : `<a class="news-more" href="https://www.screener.in/company/${encodeURIComponent(key)}/" target="_blank" rel="noopener">Filings on Screener ↗</a>`;
+}
+function newsItemsHTML(key, items) {
+  if (!items || !items.length) return `<div class="news-empty">No recent items.</div>` + newsFooter(key);
+  const rows = items.map(i => `
+    <a class="news-item" href="${escapeHtml(i.url || '#')}" target="_blank" rel="noopener">
+      ${i.kind === 'filing' ? '<span class="news-tag">FILING</span>' : ''}
+      <span class="news-item-title">${escapeHtml(i.title)}</span>
+      ${i.date ? `<span class="news-item-time">${newsTimeAgo(i.date)}</span>` : ''}
+    </a>`).join('');
+  return rows + newsFooter(key);
+}
+function newsSubHTML(key, label) {
+  const open = loadNewsOpen()[key] === true;
+  const cache = loadNewsCache()[key];
+  const body = cache ? newsItemsHTML(key, cache.items) : `<div class="news-empty">Tap to load…</div>`;
+  return `
+    <div class="news-sub" data-news="${escapeHtml(key)}">
+      <div class="news-sub-head" onclick="toggleNewsSub('${escapeHtml(key)}')">
+        <span class="news-sub-chevron ${open ? 'open' : ''}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></span>
+        <span class="news-sub-label">${escapeHtml(label)}</span>
+        <span class="news-sub-spacer"></span>
+        ${cache ? `<span class="news-sub-count">${(cache.items || []).length}</span>` : ''}
+      </div>
+      <div class="news-sub-body" id="news-body-${escapeHtml(key)}" style="${open ? '' : 'display:none;'}">${body}</div>
+    </div>`;
+}
+function newsBodyHTML() {
+  const syms = newsSymbols();
+  let html = newsSubHTML('__pulse', 'Market News · Pulse');
+  if (syms.length) html += syms.map(s => newsSubHTML(s, s)).join('');
+  else html += `<div class="news-empty" style="padding:10px 2px;">Add holdings, watchlist symbols or priority setups to see stock news here.</div>`;
+  return `<div class="news-list">${html}</div>`;
+}
+function toggleNewsSub(key) {
+  const open = loadNewsOpen();
+  const willOpen = !(open[key] === true);
+  open[key] = willOpen; saveNewsOpen(open);
+  const body = document.getElementById('news-body-' + key);
+  const chev = document.querySelector(`.news-sub[data-news="${cssEsc(key)}"] .news-sub-chevron`);
+  if (body) body.style.display = willOpen ? '' : 'none';
+  if (chev) chev.classList.toggle('open', willOpen);
+  if (willOpen) loadNewsSub(key, false);
+}
+// Fetch a subsection (cache-gated unless forced) and patch its DOM in place.
+async function loadNewsSub(key, force) {
+  const hit = loadNewsCache()[key];
+  const body = () => document.getElementById('news-body-' + key);
+  if (!force && hit && (Date.now() - hit.at) < NEWS_TTL) {
+    const b = body(); if (b) b.innerHTML = newsItemsHTML(key, hit.items); return;
+  }
+  { const b = body(); if (b) b.innerHTML = `<div class="news-empty">Loading…</div>`; }
+  try {
+    const items = await fetchNewsFor(key);
+    const c = loadNewsCache(); c[key] = { at: Date.now(), items }; saveNewsCache(c);
+    const b = body(); if (b) b.innerHTML = newsItemsHTML(key, items);
+    const cnt = document.querySelector(`.news-sub[data-news="${cssEsc(key)}"] .news-sub-count`);
+    if (cnt) cnt.textContent = items.length;
+  } catch (e) {
+    const b = body(); if (b) b.innerHTML = `<div class="news-empty">Couldn't load — tap ↻ Refresh.</div>` + newsFooter(key);
+  }
+}
+// Section refresh: clear cache for current symbols + pulse, refetch the open ones.
+function refreshHomeNews() {
+  const keys = ['__pulse', ...newsSymbols()];
+  const cache = loadNewsCache();
+  keys.forEach(k => delete cache[k]);
+  saveNewsCache(cache);
+  const open = loadNewsOpen();
+  keys.forEach(k => { if (open[k] === true) loadNewsSub(k, true); });
+  showToast('News refreshed', 'success', 1500);
+}
+// After each dashboard render: prune cache for symbols no longer present, then
+// auto-load any subsections that were left expanded.
+function loadHomeNews() {
+  const valid = new Set(['__pulse', ...newsSymbols()]);
+  const cache = loadNewsCache(); let changed = false;
+  Object.keys(cache).forEach(k => { if (!valid.has(k)) { delete cache[k]; changed = true; } });
+  if (changed) saveNewsCache(cache);
+  const open = loadNewsOpen();
+  Object.keys(open).forEach(k => { if (open[k] === true && valid.has(k)) loadNewsSub(k, false); });
 }
 
 // Unrealized totals across open satellite trades + core holdings.
