@@ -1900,6 +1900,11 @@ function BriefView({T,brief,onBrief,toastFn}){
   const [collapsed,setCollapsed]=useState(()=>{try{return new Set(JSON.parse(localStorage.getItem('insta_brief_collapsed')||'[]'))}catch(e){return new Set()}});
   const toggleCollapse=key=>setCollapsed(prev=>{const n=new Set(prev);n.has(key)?n.delete(key):n.add(key);try{localStorage.setItem('insta_brief_collapsed',JSON.stringify([...n]))}catch(e){}return n});
   const [briefLog,setBriefLog]=useState(loadBriefLog);
+  // Per-group actions menu (single ⋯ popover); also opens on long-press of the header.
+  const [grpMenu,setGrpMenu]=useState(null);
+  const lpRef=useRef(null),lpFired=useRef(false);
+  const startGrpLp=key=>{lpFired.current=false;clearTimeout(lpRef.current);lpRef.current=setTimeout(()=>{lpFired.current=true;vibrate(10);setGrpMenu(key)},480)};
+  const endGrpLp=()=>clearTimeout(lpRef.current);
   useEffect(()=>{
     if(!win.key)return;
     let stored=null;try{stored=JSON.parse(localStorage.getItem(BRIEF_LASTWIN_KEY)||'null')}catch(e){}
@@ -1973,12 +1978,19 @@ function BriefView({T,brief,onBrief,toastFn}){
   const ungrouped=items.filter(i=>!i.groupId||!groups.some(g=>g.id===i.groupId));
   if(ungrouped.length)sections.push({g:null,list:ungrouped});
   const itemRow=it=>h(BriefItem,{key:it.id,T,item:it,feedy:hasFeed(it),entries:win.future?[]:newEntries(it),done:doneIds.includes(it.id),onToggle:()=>toggle(it.id),onOpen:()=>open(it),onEntry:openEntry,onLongPress:()=>setAct(it)});
+  const grpMenuItem=(label,icon,color,onClick)=>h('button',{onClick,className:'act98',style:{display:'flex',alignItems:'center',gap:11,width:'100%',padding:'11px 15px',color,fontSize:14.5,fontWeight:500,background:'transparent',textAlign:'left',whiteSpace:'nowrap'}},h('span',{style:{display:'flex'}},icon),label);
+  const grpMenuPop=(g,key)=>grpMenu!==key?null:h(Fragment,null,
+    h('div',{onClick:()=>setGrpMenu(null),style:{position:'fixed',inset:0,zIndex:29}}),
+    h('div',{className:'fdin',style:{position:'absolute',top:'calc(100% + 4px)',right:0,zIndex:30,background:T.menuBg,border:'1px solid '+T.menuHair,borderRadius:12,overflow:'hidden',minWidth:172,boxShadow:'0 12px 36px rgba(0,0,0,.45)'}},
+      grpMenuItem('Add to group',Icons.plus(18),T.menuFg,()=>{setGrpMenu(null);setEdit({groupId:g?g.id:null,kind:'link',name:'',url:''})}),
+      g?grpMenuItem('Rename group',Icons.pencil(17),T.menuFg,()=>{setGrpMenu(null);setGName(g.name);setGrp({rename:g.id})}):null,
+      g?grpMenuItem('Delete group',Icons.trash(17),T.danger,()=>{setGrpMenu(null);onBrief(b=>({...b,items:b.items.map(i=>i.groupId===g.id?{...i,groupId:null}:i),groups:b.groups.filter(x=>x.id!==g.id)}))}):null));
   const sectionHead=(g,list)=>{const key=g?g.id:'_other';const isOpen=!collapsed.has(key);const groupNew=win.future?0:list.reduce((n,it)=>n+(hasFeed(it)?newEntries(it).length:0),0);return h('div',{style:{display:'flex',alignItems:'center',gap:8,padding:'14px 4px 4px'}},
     h('button',{onClick:()=>toggleCollapse(key),className:'act90','aria-label':isOpen?'Collapse group':'Expand group',style:{display:'flex',color:T.sub,padding:3,transform:isOpen?'rotate(90deg)':'none',transition:'transform 160ms'}},Icons.chevR(15)),
-    h('div',{onClick:()=>toggleCollapse(key),style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}},(g?g.name:'Other')+' · '+list.filter(i=>doneIds.includes(i.id)).length+'/'+list.length+(groupNew?' · '+groupNew+' new':'')),
-    g?h('button',{onClick:()=>{setGName(g.name);setGrp({rename:g.id})},className:'act90',style:{display:'flex',color:T.sub,padding:3}},Icons.pencil(16)):null,
-    g?h('button',{onClick:()=>{onBrief(b=>({...b,items:b.items.map(i=>i.groupId===g.id?{...i,groupId:null}:i),groups:b.groups.filter(x=>x.id!==g.id)}))},className:'act90',style:{display:'flex',color:T.danger,padding:3}},Icons.trash(16)):null,
-    h('button',{onClick:()=>setEdit({groupId:g?g.id:null,kind:'link',name:'',url:''}),className:'act90',style:{display:'flex',color:T.accent,padding:3}},Icons.plus(18)));};
+    h('div',{onClick:()=>{if(lpFired.current){lpFired.current=false;return}toggleCollapse(key)},onTouchStart:()=>startGrpLp(key),onTouchEnd:endGrpLp,onTouchMove:endGrpLp,onContextMenu:e=>{e.preventDefault();setGrpMenu(key)},style:{flex:1,fontSize:12,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:T.sub,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}},(g?g.name:'Other')+' · '+list.filter(i=>doneIds.includes(i.id)).length+'/'+list.length+(groupNew?' · '+groupNew+' new':'')),
+    h('div',{style:{position:'relative',flexShrink:0}},
+      h('button',{onClick:()=>setGrpMenu(grpMenu===key?null:key),className:'act90','aria-label':'Group options',style:{display:'flex',color:T.sub,padding:3}},Icons.dots(18)),
+      grpMenuPop(g,key)));};
   // Brief history as a collapsible section (open when '_history' is in the set).
   const histMissed=briefLog.reduce((n,e)=>n+e.items.reduce((m,i)=>m+i.entries.length,0),0);
   const historySection=()=>{const isOpen=collapsed.has('_history');return h('div',{style:{marginTop:8,borderTop:'1px solid '+T.hair}},
