@@ -894,6 +894,15 @@ body.reader-active #panel-reader .reader-frame {
 }
 .tv-btn:hover { background: rgba(37,132,255,0.22); border-color: rgba(37,132,255,0.45); }
 .tv-btn svg { width: 12px; height: 12px; }
+.scr-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
+  background: rgba(52,199,123,0.12); border: 1px solid rgba(52,199,123,0.25);
+  color: #34c77b; text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.scr-btn:hover { background: rgba(52,199,123,0.22); border-color: rgba(52,199,123,0.45); }
+.scr-btn svg { width: 12px; height: 12px; }
 .trade-symbol {
   font-family: var(--font-mono);
   font-size: 18px;
@@ -1896,8 +1905,11 @@ table.data-table tr:last-child td { border-bottom: none; }
 .news-item-title { flex: 1; font-size: 12.5px; line-height: 1.35; color: var(--text); }
 .news-item-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 .news-tag { font-size: 9px; font-weight: 700; letter-spacing: .04em; color: var(--accent, #6c6cf5); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; flex-shrink: 0; align-self: center; }
+.news-src { font-size: 9px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--text-muted); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0 4px; flex-shrink: 0; align-self: center; white-space: nowrap; }
 .news-empty { font-size: 12px; color: var(--text-muted); padding: 6px 0; }
 .news-more { display: inline-block; margin-top: 6px; font-size: 11.5px; color: var(--accent, #6c6cf5); text-decoration: none; }
+.news-sources { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.news-sources .news-more { margin-top: 0; }
 /* Current Holdings summary + sub-sections */
 .holdings-summary { display: flex; gap: 18px; padding: 4px 0 12px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px; }
 .hs-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
@@ -2258,9 +2270,16 @@ function tvUrl(symbol) {
 }
 
 const TV_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`;
+const SCR_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg>`;
 
+function scrUrl(symbol) {
+  return 'https://www.screener.in/company/' + encodeURIComponent(String(symbol || '').trim().toUpperCase()) + '/';
+}
+function scrBtn(symbol) {
+  return `<a class="scr-btn" href="${scrUrl(symbol)}" target="_blank" rel="noopener" title="View on Screener">${SCR_ICON}</a>`;
+}
 function tvBtn(symbol) {
-  return `<a class="tv-btn" href="${tvUrl(symbol)}" target="_blank" rel="noopener" title="View on TradingView">${TV_ICON}</a>`;
+  return `<a class="tv-btn" href="${tvUrl(symbol)}" target="_blank" rel="noopener" title="View on TradingView">${TV_ICON}</a>${scrBtn(symbol)}`;
 }
 
 // Percentage return of a closed trade relative to entry cost.
@@ -3031,15 +3050,6 @@ function loadNewsOpen() { try { return JSON.parse(localStorage.getItem(NEWS_OPEN
 function saveNewsOpen(o) { try { localStorage.setItem(NEWS_OPEN_KEY, JSON.stringify(o)); } catch (e) {} }
 function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
-// Unique symbols across core holdings, open satellite trades, watchlists, priority.
-function newsSymbols() {
-  const set = new Set();
-  (state.portfolio || []).forEach(p => p.symbol && set.add(p.symbol));
-  (state.trades || []).filter(t => t.status === 'open').forEach(t => t.symbol && set.add(t.symbol));
-  (state.watchlists || []).forEach(w => (w.symbols || []).forEach(s => s.symbol && set.add(s.symbol)));
-  (state.priority || []).forEach(p => p.symbol && set.add(p.symbol));
-  return [...set].map(s => String(s).trim().toUpperCase()).filter(Boolean).sort();
-}
 function newsTimeAgo(ts) {
   if (!ts) return '';
   const d = Math.max(0, Date.now() - ts), m = 60000, h = 3600000, day = 86400000;
@@ -3049,16 +3059,25 @@ function newsTimeAgo(ts) {
   return dd > 30 ? Math.round(dd / 30) + 'mo' : dd + 'd';
 }
 // Multi-proxy text fetch (same chain the TradingView import uses).
-async function newsFetchText(url) {
+// Race all proxies in parallel with a per-request timeout and resolve with the
+// first usable response — far faster than trying them one-by-one (a single slow
+// proxy used to stall the whole subsection).
+function newsFetchText(url, timeoutMs) {
+  timeoutMs = timeoutMs || 9000;
   const proxies = [
     u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
     u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
     u => 'https://r.jina.ai/' + u
   ];
-  for (const p of proxies) {
-    try { const res = await fetch(p(url)); if (res.ok) { const t = await res.text(); if (t && t.length > 60) return t; } } catch (e) {}
-  }
-  return '';
+  const attempts = proxies.map(p => new Promise((resolve, reject) => {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), timeoutMs);
+    fetch(p(url), { signal: ctrl.signal })
+      .then(res => (res.ok ? res.text() : Promise.reject(new Error('bad status'))))
+      .then(t => { clearTimeout(to); (t && t.length > 60) ? resolve(t) : reject(new Error('empty')); })
+      .catch(err => { clearTimeout(to); reject(err); });
+  }));
+  return Promise.any(attempts).catch(() => '');
 }
 function parseRssItems(xml, max) {
   const items = [];
@@ -3077,117 +3096,173 @@ function parseRssItems(xml, max) {
   } catch (e) {}
   return items;
 }
-async function fetchPulseNews() {
-  const xml = await newsFetchText('https://pulse.zerodha.com/feed.php');
-  return parseRssItems(xml, 8).map(i => ({ ...i, kind: 'news' }));
+// Market News aggregates several Indian market RSS feeds into one timeline.
+// Any feed that fails just contributes nothing, so the rest still populate.
+const MARKET_FEEDS = [
+  { src: 'Pulse',        url: 'https://pulse.zerodha.com/feed.php',                                        site: 'https://pulse.zerodha.com/' },
+  { src: 'Moneycontrol', url: 'https://www.moneycontrol.com/rss/marketreports.xml',                        site: 'https://www.moneycontrol.com/news/business/markets/' },
+  { src: 'ET Markets',   url: 'https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms',      site: 'https://economictimes.indiatimes.com/markets' },
+  { src: 'Mint',         url: 'https://www.livemint.com/rss/markets',                                      site: 'https://www.livemint.com/market' },
+  { src: 'NDTV Profit',  url: 'https://feeds.feedburner.com/ndtvprofit-latest',                            site: 'https://www.ndtvprofit.com/' }
+];
+async function fetchMarketNews() {
+  const results = await Promise.allSettled(
+    MARKET_FEEDS.map(f => newsFetchText(f.url, 8000).then(xml => ({ f, xml })))
+  );
+  const out = [];
+  results.forEach(r => {
+    if (r.status !== 'fulfilled' || !r.value.xml) return;
+    parseRssItems(r.value.xml, 8).forEach(i => out.push({ ...i, kind: 'news', source: r.value.f.src }));
+  });
+  const seen = new Set(), merged = [];
+  out.sort((a, b) => (b.date || 0) - (a.date || 0));
+  for (const it of out) { const k = it.title.toLowerCase().slice(0, 60); if (seen.has(k)) continue; seen.add(k); merged.push(it); }
+  return merged.slice(0, 14);
 }
 async function fetchSymbolNews(sym) {
   const out = [];
-  try { // Google News RSS (India, last 2 weeks) — reliable headlines incl. filing coverage.
-    const q = encodeURIComponent('"' + sym + '" stock');
-    const xml = await newsFetchText('https://news.google.com/rss/search?q=' + q + '+when:14d&hl=en-IN&gl=IN&ceid=IN:en');
-    parseRssItems(xml, 6).forEach(i => out.push({ ...i, kind: 'news' }));
-  } catch (e) {}
-  try { // Screener.in announcements = BSE/NSE exchange filings (best effort scrape).
-    const html = await newsFetchText('https://www.screener.in/company/' + encodeURIComponent(sym) + '/');
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const links = [...doc.querySelectorAll('a')].filter(a => /bseindia|nseindia|announcement|\.pdf/i.test(a.getAttribute('href') || ''));
-    links.slice(0, 6).forEach(a => {
-      const title = (a.textContent || '').replace(/\s+/g, ' ').trim();
-      if (title && title.length > 6) out.push({ title, url: a.href, date: 0, kind: 'filing' });
-    });
-  } catch (e) {}
+  // Fetch both sources at once so the subsection loads in a single round-trip.
+  const q = encodeURIComponent('"' + sym + '" stock');
+  const [newsRes, scrRes] = await Promise.allSettled([
+    newsFetchText('https://news.google.com/rss/search?q=' + q + '+when:14d&hl=en-IN&gl=IN&ceid=IN:en'),
+    newsFetchText('https://www.screener.in/company/' + encodeURIComponent(sym) + '/', 7000)
+  ]);
+  if (newsRes.status === 'fulfilled' && newsRes.value) {
+    parseRssItems(newsRes.value, 6).forEach(i => out.push({ ...i, kind: 'news' }));
+  }
+  if (scrRes.status === 'fulfilled' && scrRes.value) {
+    try { // Screener.in announcements = BSE/NSE exchange filings (best effort scrape).
+      const doc = new DOMParser().parseFromString(scrRes.value, 'text/html');
+      const links = [...doc.querySelectorAll('a')].filter(a => /bseindia|nseindia|announcement|\.pdf/i.test(a.getAttribute('href') || ''));
+      links.slice(0, 6).forEach(a => {
+        const title = (a.textContent || '').replace(/\s+/g, ' ').trim();
+        if (title && title.length > 6) out.push({ title, url: a.href, date: 0, kind: 'filing' });
+      });
+    } catch (e) {}
+  }
   const seen = new Set(), merged = [];
   out.sort((a, b) => (b.date || 0) - (a.date || 0));
   for (const it of out) { const k = it.title.toLowerCase().slice(0, 60); if (seen.has(k)) continue; seen.add(k); merged.push(it); }
   return merged.slice(0, 6);
 }
-async function fetchNewsFor(key) { return key === '__pulse' ? fetchPulseNews() : fetchSymbolNews(key); }
+async function fetchNewsFor(key) { return key === '__pulse' ? fetchMarketNews() : fetchSymbolNews(key); }
 
 function newsFooter(key) {
-  return key === '__pulse'
-    ? `<a class="news-more" href="https://pulse.zerodha.com/" target="_blank" rel="noopener">Open Pulse ↗</a>`
-    : `<a class="news-more" href="https://www.screener.in/company/${encodeURIComponent(key)}/" target="_blank" rel="noopener">Filings on Screener ↗</a>`;
+  if (key === '__pulse') {
+    const links = MARKET_FEEDS.map(f => `<a class="news-more" href="${f.site}" target="_blank" rel="noopener">${escapeHtml(f.src)} ↗</a>`).join('');
+    return `<div class="news-sources">${links}</div>`;
+  }
+  return `<a class="news-more" href="https://www.screener.in/company/${encodeURIComponent(key)}/" target="_blank" rel="noopener">Filings on Screener ↗</a>`;
 }
 function newsItemsHTML(key, items) {
   if (!items || !items.length) return `<div class="news-empty">No recent items.</div>` + newsFooter(key);
   const rows = items.map(i => `
     <a class="news-item" href="${escapeHtml(i.url || '#')}" target="_blank" rel="noopener">
-      ${i.kind === 'filing' ? '<span class="news-tag">FILING</span>' : ''}
+      ${i.kind === 'filing' ? '<span class="news-tag">FILING</span>' : (i.source ? `<span class="news-src">${escapeHtml(i.source)}</span>` : '')}
       <span class="news-item-title">${escapeHtml(i.title)}</span>
       ${i.date ? `<span class="news-item-time">${newsTimeAgo(i.date)}</span>` : ''}
     </a>`).join('');
   return rows + newsFooter(key);
 }
-function newsSubHTML(key, label) {
-  const open = loadNewsOpen()[key] === true;
-  const cache = loadNewsCache()[key];
-  const body = cache ? newsItemsHTML(key, cache.items) : `<div class="news-empty">Tap to load…</div>`;
+// News is grouped by the same buckets as the homepage. A symbol can live in more
+// than one bucket, so each rendered subsection has a unique render key
+// (bucket::SYMBOL) while the cache + fetch stay keyed by the symbol itself.
+function newsCategories() {
+  const uniq = arr => [...new Set(arr.map(x => String(x || '').trim().toUpperCase()).filter(Boolean))].sort();
+  const holdings = uniq([
+    ...(state.portfolio || []).map(p => p.symbol),
+    ...(state.trades || []).filter(t => t.status === 'open').map(t => t.symbol)
+  ]);
+  const priority = uniq((state.priority || []).map(p => p.symbol));
+  const watch = uniq((state.watchlists || []).flatMap(w => (w.symbols || []).map(s => s.symbol)));
+  return [
+    { id: 'holdings', label: 'Current Holdings', symbols: holdings },
+    { id: 'priority', label: 'Priority Setups', symbols: priority },
+    { id: 'watchlist', label: 'Watchlist', symbols: watch }
+  ].filter(c => c.symbols.length);
+}
+// [renderKey, cacheKey] pairs for every subsection currently on screen.
+function newsPairs() {
+  const pairs = [['__pulse', '__pulse']];
+  newsCategories().forEach(c => c.symbols.forEach(s => pairs.push([c.id + '::' + s, s])));
+  return pairs;
+}
+function newsSubHTML(renderKey, label, cacheKey) {
+  const open = loadNewsOpen()[renderKey] === true;
+  const cache = loadNewsCache()[cacheKey];
+  const body = cache ? newsItemsHTML(cacheKey, cache.items) : `<div class="news-empty">Tap to load…</div>`;
   return `
-    <div class="news-sub" data-news="${escapeHtml(key)}">
-      <div class="news-sub-head" onclick="toggleNewsSub('${escapeHtml(key)}')">
+    <div class="news-sub" data-news="${escapeHtml(renderKey)}">
+      <div class="news-sub-head" onclick="toggleNewsSub('${escapeHtml(renderKey)}','${escapeHtml(cacheKey)}')">
         <span class="news-sub-chevron ${open ? 'open' : ''}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5 16 12l-6.5 6.5"/></svg></span>
         <span class="news-sub-label">${escapeHtml(label)}</span>
         <span class="news-sub-spacer"></span>
         ${cache ? `<span class="news-sub-count">${(cache.items || []).length}</span>` : ''}
       </div>
-      <div class="news-sub-body" id="news-body-${escapeHtml(key)}" style="${open ? '' : 'display:none;'}">${body}</div>
+      <div class="news-sub-body" id="news-body-${escapeHtml(renderKey)}" style="${open ? '' : 'display:none;'}">${body}</div>
     </div>`;
 }
 function newsBodyHTML() {
-  const syms = newsSymbols();
-  let html = newsSubHTML('__pulse', 'Market News · Pulse');
-  if (syms.length) html += syms.map(s => newsSubHTML(s, s)).join('');
-  else html += `<div class="news-empty" style="padding:10px 2px;">Add holdings, watchlist symbols or priority setups to see stock news here.</div>`;
+  const cats = newsCategories();
+  let html = newsSubHTML('__pulse', 'Market News', '__pulse');
+  if (cats.length) {
+    cats.forEach(c => {
+      html += `<div class="holdings-subhead">${escapeHtml(c.label)} <span class="hs-count">${c.symbols.length}</span></div>`;
+      html += c.symbols.map(s => newsSubHTML(c.id + '::' + s, s, s)).join('');
+    });
+  } else {
+    html += `<div class="news-empty" style="padding:10px 2px;">Add holdings, watchlist symbols or priority setups to see stock news here.</div>`;
+  }
   return `<div class="news-list">${html}</div>`;
 }
-function toggleNewsSub(key) {
+function toggleNewsSub(renderKey, cacheKey) {
   const open = loadNewsOpen();
-  const willOpen = !(open[key] === true);
-  open[key] = willOpen; saveNewsOpen(open);
-  const body = document.getElementById('news-body-' + key);
-  const chev = document.querySelector(`.news-sub[data-news="${cssEsc(key)}"] .news-sub-chevron`);
+  const willOpen = !(open[renderKey] === true);
+  open[renderKey] = willOpen; saveNewsOpen(open);
+  const body = document.getElementById('news-body-' + renderKey);
+  const chev = document.querySelector(`.news-sub[data-news="${cssEsc(renderKey)}"] .news-sub-chevron`);
   if (body) body.style.display = willOpen ? '' : 'none';
   if (chev) chev.classList.toggle('open', willOpen);
-  if (willOpen) loadNewsSub(key, false);
+  if (willOpen) loadNewsSub(renderKey, cacheKey, false);
 }
 // Fetch a subsection (cache-gated unless forced) and patch its DOM in place.
-async function loadNewsSub(key, force) {
-  const hit = loadNewsCache()[key];
-  const body = () => document.getElementById('news-body-' + key);
+async function loadNewsSub(renderKey, cacheKey, force) {
+  const hit = loadNewsCache()[cacheKey];
+  const body = () => document.getElementById('news-body-' + renderKey);
   if (!force && hit && (Date.now() - hit.at) < NEWS_TTL) {
-    const b = body(); if (b) b.innerHTML = newsItemsHTML(key, hit.items); return;
+    const b = body(); if (b) b.innerHTML = newsItemsHTML(cacheKey, hit.items); return;
   }
   { const b = body(); if (b) b.innerHTML = `<div class="news-empty">Loading…</div>`; }
   try {
-    const items = await fetchNewsFor(key);
-    const c = loadNewsCache(); c[key] = { at: Date.now(), items }; saveNewsCache(c);
-    const b = body(); if (b) b.innerHTML = newsItemsHTML(key, items);
-    const cnt = document.querySelector(`.news-sub[data-news="${cssEsc(key)}"] .news-sub-count`);
+    const items = await fetchNewsFor(cacheKey);
+    const c = loadNewsCache(); c[cacheKey] = { at: Date.now(), items }; saveNewsCache(c);
+    const b = body(); if (b) b.innerHTML = newsItemsHTML(cacheKey, items);
+    const cnt = document.querySelector(`.news-sub[data-news="${cssEsc(renderKey)}"] .news-sub-count`);
     if (cnt) cnt.textContent = items.length;
   } catch (e) {
-    const b = body(); if (b) b.innerHTML = `<div class="news-empty">Couldn't load — tap ↻ Refresh.</div>` + newsFooter(key);
+    const b = body(); if (b) b.innerHTML = `<div class="news-empty">Couldn't load — tap ↻ Refresh.</div>` + newsFooter(cacheKey);
   }
 }
 // Section refresh: clear cache for current symbols + pulse, refetch the open ones.
 function refreshHomeNews() {
-  const keys = ['__pulse', ...newsSymbols()];
+  const pairs = newsPairs();
   const cache = loadNewsCache();
-  keys.forEach(k => delete cache[k]);
+  [...new Set(pairs.map(p => p[1]))].forEach(k => delete cache[k]);
   saveNewsCache(cache);
   const open = loadNewsOpen();
-  keys.forEach(k => { if (open[k] === true) loadNewsSub(k, true); });
+  pairs.forEach(([rk, ck]) => { if (open[rk] === true) loadNewsSub(rk, ck, true); });
   showToast('News refreshed', 'success', 1500);
 }
 // After each dashboard render: prune cache for symbols no longer present, then
 // auto-load any subsections that were left expanded.
 function loadHomeNews() {
-  const valid = new Set(['__pulse', ...newsSymbols()]);
+  const pairs = newsPairs();
+  const valid = new Set(pairs.map(p => p[1]));
   const cache = loadNewsCache(); let changed = false;
   Object.keys(cache).forEach(k => { if (!valid.has(k)) { delete cache[k]; changed = true; } });
   if (changed) saveNewsCache(cache);
   const open = loadNewsOpen();
-  Object.keys(open).forEach(k => { if (open[k] === true && valid.has(k)) loadNewsSub(k, false); });
+  pairs.forEach(([rk, ck]) => { if (open[rk] === true) loadNewsSub(rk, ck, false); });
 }
 
 // Unrealized totals across open satellite trades + core holdings.
