@@ -943,7 +943,8 @@ const Icons={
   file:s=>Svg({size:s},P('M6.5 4c0-.8.7-1.5 1.5-1.5h5l4 4V20c0 .8-.7 1.5-1.5 1.5H8c-.8 0-1.5-.7-1.5-1.5V4Z'),P('M13 2.5V6.5h4')),
   pin:(s,fill)=>Svg({size:s},h('path',{d:'M9 3.5h6l-.8 5 2.8 3.2H7l2.8-3.2-.8-5Z',fill:fill?'currentColor':'none',stroke:'currentColor',strokeWidth:1.6,strokeLinejoin:'round'}),P('M12 11.7V20')),
   crop:s=>Svg({size:s},P('M6.5 2.5v15h15'),P('M2.5 6.5h15v15')),
-  rotate:s=>Svg({size:s},P('M20 11a8 8 0 1 0-2.3 5.6'),P('M20 5v6h-6'))
+  rotate:s=>Svg({size:s},P('M20 11a8 8 0 1 0-2.3 5.6'),P('M20 5v6h-6')),
+  newspaper:s=>Svg({size:s},P('M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2'),P('M18 14h-8'),P('M15 18h-5'),P('M10 6h8v4h-8V6Z'))
 };
 /* ============================== shared UI ============================== */
 const iconBtnS={width:42,height:42,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:10,flexShrink:0};
@@ -1100,7 +1101,7 @@ function Sidebar({T,scope,folders,onScope,onClose,onFolderLongPress,onBrowse,onS
     {key:'liked',icon:Icons.heart(22),label:'Liked',active:is('liked'),onClick:()=>go('liked')},
     {key:'archive',icon:Icons.archive(22),label:'Archive',active:is('archive'),onClick:()=>go('archive')},
     {key:'photos',icon:Icons.image(22),label:'Photos',active:is('photos'),onClick:()=>go('photos')},
-    {key:'brief',icon:Icons.sun(22),label:'Daily Brief',active:is('brief'),onClick:()=>go('brief')},
+    {key:'brief',icon:Icons.newspaper(22),label:'Daily Brief',active:is('brief'),onClick:()=>go('brief')},
     {key:'notes',icon:Icons.notes(22),label:'Notes',active:is('notes'),onClick:()=>go('notes')},
     {key:'tags',icon:Icons.tag(22),label:'Tags',active:is('tags'),onClick:()=>go('tags')},
     {key:'browse',icon:Icons.globe(22),label:'Browse',active:false,onClick:()=>{onClose();onBrowse()}},
@@ -2014,7 +2015,7 @@ function BriefView({T,brief,onBrief,toastFn}){
     h('div',{style:{padding:'2px 14px 0'}},
       win.future?h('div',{style:{fontSize:12.5,color:T.sub,background:T.card,borderRadius:10,padding:'10px 12px',margin:'6px 2px',lineHeight:1.45}},'This brief begins at '+fmtClock(curSlot.time)+'. New videos since your last brief will appear here then.'):null,
       total?sections.map(({g,list})=>h('div',{key:g?g.id:'_other'},sectionHead(g,list),collapsed.has(g?g.id:'_other')?null:(list.length?list.map(itemRow):h('div',{style:{fontSize:12.5,color:T.sub,padding:'6px 4px 10px'}},'Nothing here yet — tap + to add.'))))
-        :h(EmptyState,{T,icon:Icons.sun(40),title:'Your daily brief',sub:'Group the social apps, websites and YouTube channels you go through each day, then check them off.'}),
+        :h(EmptyState,{T,icon:Icons.newspaper(40),title:'Your daily brief',sub:'Group the social apps, websites and YouTube channels you go through each day, then check them off.'}),
       h('button',{onClick:()=>{setGName('');setGrp({})},className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:18,padding:'11px 14px',borderRadius:11,border:'1px dashed '+T.hair,color:T.fg,fontSize:14,fontWeight:500}},Icons.plus(18),'New group'),
       h('button',{onClick:()=>setEdit({groupId:groups[0]?groups[0].id:null,kind:'link',name:'',url:''}),className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:10,padding:'11px 14px',borderRadius:11,background:T.card,color:T.fg,fontSize:14,fontWeight:600}},Icons.plus(18),'Add item'),
       historySection(),
@@ -3186,14 +3187,15 @@ function App(){
       h('button',{onClick:()=>setSelecting(null),style:{padding:'10px 14px',color:T.accent,fontSize:15.5,fontWeight:500}},'Cancel'),
       h('div',{style:{flex:1,textAlign:'center',fontSize:16,fontWeight:600}},
         selecting.mode==='playlist'?'Playlist · '+selecting.ids.length:selecting.ids.length+' selected'),
-      h('div',{style:{width:70}}));
+      selecting.mode!=='playlist'?(()=>{const allIds=list.map(a=>a.id);const allSel=allIds.length>0&&allIds.every(id=>selecting.ids.includes(id));
+        return h('button',{onClick:()=>setSelecting(s=>s?{...s,ids:allSel?[]:allIds}:s),style:{padding:'10px 14px',color:T.accent,fontSize:15,fontWeight:500,whiteSpace:'nowrap'}},allSel?'None':'All');})():h('div',{style:{width:70}}));
   }else{
     header=h('div',{style:{display:'flex',alignItems:'center',padding:'6px 8px',flexShrink:0,position:'relative'}},
       headerBtn(scope.type==='tag'?Icons.back(23):Icons.menu(23),()=>scope.type==='tag'?setScope({type:'tags'}):setSidebar(true)),
       h('button',{onClick:goHome,className:'act90','aria-label':'Go to top of Home',style:{marginLeft:2,padding:'2px 6px',textAlign:'left',fontFamily:WORDMARK,fontSize:21,fontWeight:600,letterSpacing:'.2px',color:T.fg,background:'none',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'52%'}},scopeTitle(scope,data.folders)),
       h('div',{style:{flex:1}}),
       headerBtn(Icons.ai(22),()=>setAiOpen({})),
-      headerBtn(Icons.sun(22),()=>{setScope({type:'brief'});setQuery('')}),
+      headerBtn(Icons.newspaper(22),()=>{setScope({type:'brief'});setQuery('')}),
       headerBtn(Icons.contrast(22),cycleTheme),
       headerBtn(Icons.globe(22),()=>setBrowserO({url:''})),
       EMBEDDED?headerBtn(Icons.back(23),exitToHost):null);
@@ -3247,6 +3249,7 @@ function App(){
                     style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,width:'100%',padding:'11px 15px',color:T.menuFg,fontSize:14.5,fontWeight:v===S.typeFilter?600:400,background:'transparent',textAlign:'left'}},
                     l,v===S.typeFilter?h('span',{style:{display:'flex',color:T.accent}},Icons.check(16)):null)))):null),
             h('button',{onClick:()=>setS({readFilter:S.readFilter==='read'?'unread':'read'}),className:'act90',style:chip(true),title:'Toggle read / unread'},S.readFilter==='read'?'Read':'Unread'),
+            h('button',{onClick:()=>setSelecting({mode:'select',ids:[]}),className:'act90',style:chip(false),title:'Select multiple'},Icons.checkCircle(15),'Select'),
             h('div',{style:{flex:1,minWidth:6}}),
             h('div',{style:{position:'relative'}},
               h('button',{onClick:()=>{setFilterMenu(false);setSortMenu(v=>!v)},className:'act90',style:chip(true),title:'Sort'},Icons.sort(14),curSort,Icons.chevD?Icons.chevD(13):null),
