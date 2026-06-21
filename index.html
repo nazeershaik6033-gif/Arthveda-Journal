@@ -3036,9 +3036,17 @@ function toggleHomeSection(key) {
 
 function renderDashboard() {
   const sec = loadHomeSections();
+  const openTrades = (state.trades || []).filter(t => t.status === 'open');
+  const coreItems = state.portfolio || [];
+  const addBtn = `<button class="btn btn-sm" onclick="event.stopPropagation(); switchTab('entry')">+ Add</button>`;
+  // Satellite and Core are now independent, separately collapsible sections.
+  // When there are no holdings at all, fall back to the single combined card.
+  const holdingsBlock = (!openTrades.length && !coreItems.length)
+    ? homeSection('holdings', 'Current Holdings', currentHoldingsHTML(), addBtn, sec.holdings)
+    : homeSection('holdings-sat', `Satellite — Open <span class="hs-count">${openTrades.length}</span>`, satelliteHoldingsBody(), addBtn, sec['holdings-sat'])
+      + homeSection('holdings-core', `Core Holdings <span class="hs-count">${coreItems.length}</span>`, coreHoldingsBody(), addBtn, sec['holdings-core']);
   document.getElementById('panel-dashboard').innerHTML = `
-    ${homeSection('holdings', 'Current Holdings', currentHoldingsHTML(),
-      `<button class="btn btn-sm" onclick="event.stopPropagation(); switchTab('entry')">+ Add</button>`, sec.holdings)}
+    ${holdingsBlock}
     ${homeSection('priority', 'Priority Setups', priorityBodyHTML(),
       `<button class="btn btn-sm" onclick="event.stopPropagation(); openPriorityModal()">+ Add Setup</button>`, sec.priority)}
     ${homeSection('watchlist', 'Watchlist', watchlistBodyHTML('wlCardsHome'),
@@ -3281,14 +3289,15 @@ function loadHomeNews() {
 }
 
 // Unrealized totals across open satellite trades + core holdings.
-function holdingsTotals() {
+// scope: 'core' | 'satellite' | undefined (= both)
+function holdingsTotals(scope) {
   let invested = 0, current = 0;
-  (state.portfolio || []).forEach(p => {
+  if (scope !== 'satellite') (state.portfolio || []).forEach(p => {
     const live = window.livePrices[p.symbol];
     const inv = Number(p.qty) * Number(p.avgPrice);
     invested += inv; current += live ? Number(p.qty) * live.price : inv;
   });
-  (state.trades || []).filter(t => t.status === 'open').forEach(t => {
+  if (scope !== 'core') (state.trades || []).filter(t => t.status === 'open').forEach(t => {
     const live = window.livePrices[t.symbol];
     const inv = Number(t.entryQty) * Number(t.entryPrice);
     invested += inv; current += live ? Number(t.entryQty) * live.price : inv;
@@ -3297,19 +3306,47 @@ function holdingsTotals() {
   const pct = invested ? (pnl / invested) * 100 : 0;
   return { invested, current, pnl, pct };
 }
-function holdingsSummaryHTML() {
-  const t = holdingsTotals();
+function holdingsSummaryHTML(scope, pnlId) {
+  const t = holdingsTotals(scope);
   return `<div class="holdings-summary">
     <div><div class="hs-label">Invested</div><div class="mono hs-val">${formatINR(t.invested)}</div></div>
-    <div><div class="hs-label">Unrealized P&amp;L</div><div class="mono hs-val ${pnlClass(t.pnl)}" id="homeHoldingsPnl">${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span></div></div>
+    <div><div class="hs-label">Unrealized P&amp;L</div><div class="mono hs-val ${pnlClass(t.pnl)}" id="${pnlId || 'homeHoldingsPnl'}">${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span></div></div>
   </div>`;
 }
 function updateHoldingsSummary() {
-  const el = document.getElementById('homeHoldingsPnl');
-  if (!el) return;
-  const t = holdingsTotals();
-  el.innerHTML = `${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span>`;
-  setPnlClass(el, t.pnl);
+  [['homeHoldingsPnl', undefined], ['homeHoldingsPnlSat', 'satellite'], ['homeHoldingsPnlCore', 'core']].forEach(([id, scope]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const t = holdingsTotals(scope);
+    el.innerHTML = `${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span>`;
+    setPnlClass(el, t.pnl);
+  });
+}
+// Independent Satellite / Core holdings bodies for the homepage, each with its
+// own subtotal and a symbol filter (shown once there are enough rows to need it).
+function filterHoldingsList(inputEl, listId) {
+  const q = inputEl.value.trim().toLowerCase();
+  const list = document.getElementById(listId);
+  if (!list) return;
+  list.querySelectorAll('.trade-card').forEach(card => {
+    const symEl = card.querySelector('.trade-symbol');
+    const sym = (symEl ? symEl.textContent : '').toLowerCase();
+    card.style.display = (!q || sym.includes(q)) ? '' : 'none';
+  });
+}
+function satelliteHoldingsBody() {
+  const openTrades = (state.trades || []).filter(t => t.status === 'open');
+  if (!openTrades.length) return `<div class="holdings-empty">No open satellite trades</div>`;
+  const search = openTrades.length > 3 ? `<input class="holdings-search" type="search" placeholder="Filter satellite…" oninput="filterHoldingsList(this,'satHoldingsList')">` : '';
+  return holdingsSummaryHTML('satellite', 'homeHoldingsPnlSat') + search +
+    `<div id="satHoldingsList">${openTrades.map(t => renderTradeCard(t)).join('')}</div>`;
+}
+function coreHoldingsBody() {
+  const coreItems = state.portfolio || [];
+  if (!coreItems.length) return `<div class="holdings-empty">No core holdings</div>`;
+  const search = coreItems.length > 3 ? `<input class="holdings-search" type="search" placeholder="Filter core…" oninput="filterHoldingsList(this,'coreHoldingsList')">` : '';
+  return holdingsSummaryHTML('core', 'homeHoldingsPnlCore') + search +
+    `<div id="coreHoldingsList">${coreItems.map(p => coreHoldingCard(p)).join('')}</div>`;
 }
 
 // Current Holdings: two sub-sections (Satellite-open, Core) in the trade-card style.
