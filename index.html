@@ -1884,6 +1884,13 @@ table.data-table tr:last-child td { border-bottom: none; }
 .home-sec-chevron.open { transform: rotate(90deg); }
 .home-sec-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .home-sec-body { padding: 0 16px 16px; }
+/* Nested sub-sections (Satellite / Core inside Current Holdings): flatten the
+   card chrome so they read as sub-groups rather than cards within a card. */
+.home-sec-body .home-sec { margin-top: 8px; border: none; border-radius: 0; background: transparent; box-shadow: none; border-top: 1px solid var(--border-subtle); }
+.home-sec-body .home-sec:first-child { margin-top: 0; border-top: none; }
+.home-sec-body .home-sec-head { padding: 10px 0; }
+.home-sec-body .home-sec-title .card-title { font-size: 14px; }
+.home-sec-body .home-sec-body { padding: 0 0 6px; }
 /* Home News section — collapsible per-symbol subsections */
 .news-list { display: flex; flex-direction: column; gap: 6px; }
 .news-sub { border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; }
@@ -3043,12 +3050,14 @@ function renderDashboard() {
   const openTrades = (state.trades || []).filter(t => t.status === 'open');
   const coreItems = state.portfolio || [];
   const addBtn = `<button class="btn btn-sm" onclick="event.stopPropagation(); switchTab('entry')">+ Add</button>`;
-  // Satellite and Core are now independent, separately collapsible sections.
-  // When there are no holdings at all, fall back to the single combined card.
+  // Current Holdings is one collapsible section; Satellite and Core sit inside it
+  // as their own independently-collapsible sub-sections.
+  const subSecs =
+    homeSection('holdings-sat', `Satellite <span class="hs-count">${openTrades.length}</span>`, satelliteHoldingsBody(), '', sec['holdings-sat'])
+    + homeSection('holdings-core', `Core <span class="hs-count">${coreItems.length}</span>`, coreHoldingsBody(), '', sec['holdings-core']);
   const holdingsBlock = (!openTrades.length && !coreItems.length)
     ? homeSection('holdings', 'Current Holdings', currentHoldingsHTML(), addBtn, sec.holdings)
-    : homeSection('holdings-sat', `Satellite — Open <span class="hs-count">${openTrades.length}</span>`, satelliteHoldingsBody(), addBtn, sec['holdings-sat'])
-      + homeSection('holdings-core', `Core Holdings <span class="hs-count">${coreItems.length}</span>`, coreHoldingsBody(), addBtn, sec['holdings-core']);
+    : homeSection('holdings', 'Current Holdings', subSecs, addBtn, sec.holdings);
   document.getElementById('panel-dashboard').innerHTML = `
     ${holdingsBlock}
     ${homeSection('priority', 'Priority Setups', priorityBodyHTML(),
