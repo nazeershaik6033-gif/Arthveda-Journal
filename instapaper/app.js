@@ -2695,14 +2695,19 @@ function BookmarkTile({T,site,onOpen,onLongPress}){
       h('img',{src:faviconUrl(site.url),alt:'',style:{width:30,height:30},onError:e=>{e.target.style.opacity=0}})),
     h('span',{style:{fontSize:11.5,color:T.meta,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},site.name));
 }
-/* Folder shown as a tile in the same grid as bookmarks — a rounded square with a
-   folder glyph and the name below; tap opens it, long-press renames. */
-function BrowserFolderTile({T,folder,count,onOpen,onLongPress}){
+/* Folder shown as a tile in the same grid as bookmarks — the rounded square shows
+   the site favicons inside it (single favicon like a bookmark, or a mini mosaic
+   for several), with the folder name below; tap opens it, long-press renames. */
+function BrowserFolderTile({T,folder,sites,onOpen,onLongPress}){
   const lp=useLongPress(onLongPress);
+  const fav=(u,sz)=>h('img',{src:faviconUrl(u),alt:'',style:{width:sz,height:sz,borderRadius:4},onError:e=>{e.target.style.opacity=0}});
+  let inner;
+  if(!sites.length)inner=h('span',{style:{color:T.accent,display:'flex'}},Icons.folder(26));
+  else if(sites.length===1)inner=fav(sites[0].url,30);
+  else inner=h('span',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:3,padding:6}},
+    sites.slice(0,4).map((s,i)=>h('span',{key:i,style:{display:'flex',alignItems:'center',justifyContent:'center'}},fav(s.url,18))));
   return h('button',Object.assign({onClick:onOpen},lp,{className:'act95',style:{display:'flex',flexDirection:'column',alignItems:'center',gap:7,minWidth:0,background:'none'}}),
-    h('span',{style:{position:'relative',width:54,height:54,borderRadius:14,background:T.card,display:'flex',alignItems:'center',justifyContent:'center',color:T.accent}},
-      Icons.folder(26),
-      count?h('span',{style:{position:'absolute',top:-4,right:-4,minWidth:18,height:18,padding:'0 5px',borderRadius:9,background:T.accent,color:T.bg,fontSize:10.5,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}},count):null),
+    h('span',{style:{width:54,height:54,borderRadius:14,background:T.card,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}},inner),
     h('span',{style:{fontSize:11.5,color:T.meta,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},folder.name));
 }
 
@@ -2724,7 +2729,7 @@ function Browser({T,sites,onSites,folders,onFolders,vault,onChangeVault,session,
     h('span',{style:{width:54,height:54,borderRadius:14,border:'1.5px dashed '+T.sub,display:'flex',alignItems:'center',justifyContent:'center',color:T.sub}},Icons.plus(22)),
     h('span',{style:{fontSize:11.5,color:T.sub}},'Add'));
   const tile=st=>h(BookmarkTile,{key:st.id,T,site:st,onOpen:()=>open(st.url),onLongPress:()=>setActSite(st)});
-  const folderTile=f=>h(BrowserFolderTile,{key:f.id,T,folder:f,count:sites.filter(s=>s.folderId===f.id).length,onOpen:()=>setOpenFolder(f.id),onLongPress:()=>{setFName(f.name);setMkFolder({rename:f.id})}});
+  const folderTile=f=>h(BrowserFolderTile,{key:f.id,T,folder:f,sites:sites.filter(s=>s.folderId===f.id),onOpen:()=>setOpenFolder(f.id),onLongPress:()=>{setFName(f.name);setMkFolder({rename:f.id})}});
   const grid=children=>h('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14}},children);
   const loose=sites.filter(s=>!s.folderId||!folders.some(f=>f.id===s.folderId));
   const curFolder=openFolder?folders.find(f=>f.id===openFolder):null;
