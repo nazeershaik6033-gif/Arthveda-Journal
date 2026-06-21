@@ -2076,7 +2076,9 @@ let calendarMonth = new Date();
 let calendarFilter = 'all';
 let journalView = 'daily';        // daily | monthly | calendar
 let dashboardRange = 'all';       // 1w | 1m | ytd | all
-let aiView = 'hub';               // hub | chat | business | reviewer | insights | chart
+let aiView = 'hub';               // hub | chat | business | reviewer | insights | chart | photoimport
+let aiPhotoImages = [];           // data URLs of uploaded screenshots
+let aiPhotoItems = [];            // parsed extraction rows pending review
 let aiChatMessages = [];          // {role:'user'|'assistant', text, image?}
 let aiBusy = false;
 let aiAttachImage = null;         // pending data-URL for chat attach
@@ -6294,6 +6296,7 @@ const AI_FEATURES = [
   { id: 'reviewer',   icon: '🔍', title: 'Trade Reviewer',    sub: 'Find mistakes & rule violations' },
   { id: 'insights',   icon: '💡', title: 'AI Insights',       sub: 'Performance patterns & suggestions' },
   { id: 'chart',      icon: '📷', title: 'Chart Reader',      sub: 'Upload chart + add prompt for AI analysis' },
+  { id: 'photoimport',icon: '🖼️', title: 'Import from Photos', sub: 'Charts/screenshots → Setups, Holdings, Watchlist' },
 ];
 
 function renderAI() {
@@ -6347,6 +6350,7 @@ function renderAI() {
     setupDropZone('aiChartDrop', 'aiChartFile', (b64) => aiReadChart(b64));
     return;
   }
+  if (aiView === 'photoimport') { panel.innerHTML = head + aiPhotoImportHTML(); aiWirePhotoImport(); return; }
 }
 
 function aiGoTo(view) {
@@ -6854,6 +6858,163 @@ function aiChartSendPrompt() {
   const img = document.querySelector('#aiChartDrop img');
   if (!img) return showToast('Upload a chart image first', 'error');
   aiReadChart(img.src);
+}
+
+/* ====================================================================
+   AI · IMPORT FROM PHOTOS — multi-image + prompt → extract → review →
+   add to Priority Setups / Holdings (Core/Satellite) / Watchlist.
+   ==================================================================== */
+function aiPhotoImportHTML() {
+  return `
+    ${aiNoKeyBanner()}
+    <p class="section-panel-desc" style="margin-top:0">Upload one or more screenshots — chart setups, a watchlist, a holdings page — add an optional instruction, and AI extracts the stocks and fields. You review everything before anything is added.</p>
+    <div class="drop-zone" id="aiPhotoDrop">
+      <div><div style="font-size:28px;opacity:0.4;">🖼️</div><div style="margin-top:6px;font-size:13px;">Click or drag a screenshot — tap again to add more</div></div>
+      <input type="file" id="aiPhotoFile" accept="image/*" style="display:none">
+    </div>
+    <div id="aiPhotoThumbs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;"></div>
+    <div class="form-group" style="margin-top:12px;">
+      <label class="form-label">Instruction (optional)</label>
+      <textarea class="form-textarea" id="aiPhotoPrompt" rows="2" placeholder="e.g. These are breakout setups — add to Priority with entry/SL/target. Or: this is my holdings page, add to Core."></textarea>
+    </div>
+    <button class="btn" id="aiPhotoExtractBtn" onclick="aiPhotoExtract()" style="width:100%;">Extract from photos</button>
+    <div id="aiPhotoResult" style="margin-top:14px;"></div>`;
+}
+function aiWirePhotoImport() {
+  aiPhotoImages = []; aiPhotoItems = [];
+  // Each click/drop appends one image; add several by repeating (works on iOS too).
+  setupDropZone('aiPhotoDrop', 'aiPhotoFile', (b64) => { aiPhotoImages.push(b64); aiRenderPhotoThumbs(); });
+}
+function aiRenderPhotoThumbs() {
+  const wrap = document.getElementById('aiPhotoThumbs');
+  if (!wrap) return;
+  wrap.innerHTML = aiPhotoImages.map((src, i) =>
+    `<div style="position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border);">
+      <img src="${src}" style="width:100%;height:100%;object-fit:cover;">
+      <button onclick="aiPhotoRemove(${i})" title="Remove" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:1;cursor:pointer;">×</button>
+    </div>`).join('');
+}
+function aiPhotoRemove(i) { aiPhotoImages.splice(i, 1); aiRenderPhotoThumbs(); }
+async function aiPhotoExtract() {
+  if (aiBusy) return;
+  if (!aiHasKey()) return showToast('Add an API key in Settings first', 'error');
+  if (!aiPhotoImages.length) return showToast('Add at least one photo', 'error');
+  const out = document.getElementById('aiPhotoResult');
+  aiBusy = true;
+  document.getElementById('aiPhotoExtractBtn').disabled = true;
+  out.innerHTML = `<div class="ai-result ai-bubble thinking">Reading ${aiPhotoImages.length} image${aiPhotoImages.length === 1 ? '' : 's'}…</div>`;
+  const userPrompt = (document.getElementById('aiPhotoPrompt') || {}).value || '';
+  const system = `You extract structured trading data from screenshots (stock charts, watchlists, holdings/positions pages, broker apps). Return ONLY a JSON array — no markdown, no commentary. Each element:
+{"symbol":"UPPERCASE_TICKER","dest":"setup|core|satellite|watch","category":"stocks|futures|options","setup":"short setup/pattern name","trigger":number|null,"target":number|null,"sl":number|null,"qty":number|null,"avgPrice":number|null,"notes":"short note"}
+Rules:
+- dest "setup" when an entry/trigger, target or stop-loss is shown or implied by a chart.
+- dest "core" or "satellite" when a quantity and average buy price are shown (a holding) — use "core" unless told otherwise.
+- dest "watch" when it's just a symbol/levels to monitor.
+- Numbers are plain digits, or null if not visible. "symbol" is the ticker only.
+- Follow the user's instruction about destinations and which fields matter.
+Return [] if nothing is extractable.`;
+  const messages = [{ role: 'user', text: (userPrompt.trim() ? userPrompt.trim() + '\n\n' : '') + `Extract every stock from ${aiPhotoImages.length} image(s) as the specified JSON.`, image: aiPhotoImages[0] }];
+  for (let i = 1; i < aiPhotoImages.length; i++) messages.push({ role: 'user', image: aiPhotoImages[i] });
+  try {
+    const reply = await callAI(system, messages);
+    const items = aiParseJsonArray(reply);
+    if (!items || !items.length) {
+      out.innerHTML = `<div class="ai-nokey">Couldn't extract any stocks. Try a clearer screenshot or a more specific instruction.<details style="margin-top:6px;"><summary style="cursor:pointer;">Raw response</summary><pre style="white-space:pre-wrap;font-size:11px;">${escapeHtml(reply)}</pre></details></div>`;
+    } else {
+      aiPhotoItems = items.map(normalizePhotoItem);
+      out.innerHTML = aiPhotoReviewHTML();
+    }
+  } catch (err) {
+    out.innerHTML = `<div class="ai-nokey">⚠️ ${escapeHtml(err.message)}</div>`;
+  }
+  aiBusy = false;
+  const b = document.getElementById('aiPhotoExtractBtn'); if (b) b.disabled = false;
+}
+function aiParseJsonArray(text) {
+  let t = String(text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const s = t.indexOf('['), e = t.lastIndexOf(']');
+  if (s >= 0 && e > s) t = t.slice(s, e + 1);
+  try { const v = JSON.parse(t); return Array.isArray(v) ? v : null; } catch (_) { return null; }
+}
+function normalizePhotoItem(it) {
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+  const dest = ['setup', 'core', 'satellite', 'watch'].includes(it.dest) ? it.dest : 'setup';
+  return {
+    include: true,
+    symbol: String(it.symbol || '').toUpperCase().replace(/[^A-Z0-9&.-]/g, ''),
+    dest,
+    category: ['stocks', 'futures', 'options'].includes(it.category) ? it.category : 'stocks',
+    setup: String(it.setup || '').slice(0, 60),
+    trigger: num(it.trigger), target: num(it.target), sl: num(it.sl),
+    qty: num(it.qty), avgPrice: num(it.avgPrice),
+    notes: String(it.notes || '').slice(0, 200)
+  };
+}
+function aiPhotoReviewHTML() {
+  const destOpts = [['setup', 'Priority Setup'], ['core', 'Holding · Core'], ['satellite', 'Holding · Satellite'], ['watch', 'Watchlist']];
+  const rows = aiPhotoItems.map((it, i) => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--surface-3);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <input type="checkbox" ${it.include ? 'checked' : ''} onchange="aiPhotoItems[${i}].include=this.checked" style="width:16px;height:16px;">
+        <input value="${escapeHtml(it.symbol)}" oninput="aiPhotoItems[${i}].symbol=this.value.toUpperCase()" style="flex:1;font-weight:700;font-family:var(--font-mono,monospace);text-transform:uppercase;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2,var(--surface-3));color:var(--text);">
+        <select onchange="aiPhotoSetDest(${i}, this.value)" style="padding:4px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2,var(--surface-3));color:var(--text);">
+          ${destOpts.map(([v, l]) => `<option value="${v}" ${it.dest === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div id="aiPhotoFields-${i}" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">${aiPhotoFieldsHTML(it, i)}</div>
+    </div>`).join('');
+  const n = aiPhotoItems.filter(x => x.include).length;
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <strong style="font-size:14px;">Review ${aiPhotoItems.length} extracted</strong>
+      <button class="btn btn-success btn-sm" onclick="aiPhotoApply()">Add ${n} selected →</button>
+    </div>
+    ${rows}
+    <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:4px;" onclick="aiPhotoApply()">Add selected to journal</button>`;
+}
+function aiPhotoFieldsHTML(it, i) {
+  const f = (label, key, val) => `<div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;">${label}</div><input value="${val == null ? '' : val}" oninput="aiPhotoItems[${i}].${key}=this.value===''?null:parseFloat(this.value)" type="number" step="0.01" style="width:100%;font-size:13px;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2,var(--surface-3));color:var(--text);"></div>`;
+  if (it.dest === 'setup') return f('Trigger', 'trigger', it.trigger) + f('Target', 'target', it.target) + f('Stop', 'sl', it.sl);
+  if (it.dest === 'core' || it.dest === 'satellite') return f('Qty', 'qty', it.qty) + f('Avg Buy', 'avgPrice', it.avgPrice) + `<div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;">Name</div><input value="${escapeHtml(it.setup)}" oninput="aiPhotoItems[${i}].setup=this.value" style="width:100%;font-size:13px;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2,var(--surface-3));color:var(--text);"></div>`;
+  return `<div style="grid-column:1/4;font-size:12px;color:var(--text-muted);">Will be added to your watchlist.</div>`;
+}
+function aiPhotoSetDest(i, v) {
+  aiPhotoItems[i].dest = v;
+  const c = document.getElementById('aiPhotoFields-' + i);
+  if (c) c.innerHTML = aiPhotoFieldsHTML(aiPhotoItems[i], i);
+}
+async function aiPhotoApply() {
+  const sel = aiPhotoItems.filter(it => it.include && it.symbol);
+  if (!sel.length) return showToast('Nothing selected', 'error');
+  const now = new Date().toISOString();
+  let counts = { setup: 0, core: 0, satellite: 0, watch: 0, skipped: 0 };
+  if (!state.watchlists.length) state.watchlists.push({ id: 'w1', name: 'Default', symbols: [] });
+  const wl = state.watchlists.find(w => w.id === activeSubTab.wl) || state.watchlists[0];
+  sel.forEach(it => {
+    if (it.dest === 'setup') {
+      state.priority.push({ id: generateId(), symbol: it.symbol, category: it.category, setup: it.setup, trigger: it.trigger, target: it.target, sl: it.sl, notes: it.notes, chart: null, createdAt: now });
+      counts.setup++;
+    } else if (it.dest === 'core') {
+      state.portfolio.push({ id: generateId(), symbol: it.symbol, tradeName: it.setup || 'AI photo import', qty: it.qty || 0, avgPrice: it.avgPrice || 0, category: it.category, addedAt: now });
+      counts.core++;
+    } else if (it.dest === 'satellite') {
+      state.trades.push({ id: generateId(), portfolioType: 'satellite', status: 'open', category: it.category, symbol: it.symbol, tradeName: it.setup || 'AI photo import', entryPrice: it.avgPrice || 0, entryQty: it.qty || 0, entryDate: now, entryDesc: it.notes || '', tags: ['ai-import'], createdAt: now });
+      counts.satellite++;
+    } else {
+      if (wl.symbols.find(s => s.symbol === it.symbol)) { counts.skipped++; return; }
+      wl.symbols.push({ symbol: it.symbol, notes: it.notes || '', gtt: null, addedAt: now });
+      counts.watch++;
+    }
+  });
+  await saveState();
+  const parts = [];
+  if (counts.setup) parts.push(`${counts.setup} setup${counts.setup > 1 ? 's' : ''}`);
+  if (counts.core) parts.push(`${counts.core} core`);
+  if (counts.satellite) parts.push(`${counts.satellite} satellite`);
+  if (counts.watch) parts.push(`${counts.watch} watchlist`);
+  showToast(`Added ${parts.join(', ') || 'nothing'}${counts.skipped ? ` · ${counts.skipped} dup skipped` : ''}`, 'success');
+  aiPhotoItems = []; aiPhotoImages = [];
+  aiGoTo('hub');
 }
 
 async function aiBusinessFollowUp() {
