@@ -1826,9 +1826,6 @@ table.data-table tr:last-child td { border-bottom: none; }
       <span class="header-brand-name">NazTrades</span>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" id="readerBtn" title="Reader" aria-label="Open Reader">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-      </button>
       <button class="icon-btn" id="aiBtn" title="AI" aria-label="AI">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/></svg>
       </button>
@@ -1837,9 +1834,6 @@ table.data-table tr:last-child td { border-bottom: none; }
       </button>
       <button class="icon-btn" id="themeToggleBtn" title="Change theme" aria-label="Change theme">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 3a9 9 0 0 0 0 18z"/></svg>
-      </button>
-      <button class="icon-btn" id="readerArrowBtn" title="Open Reader" aria-label="Open Reader">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
     </div>
   </div>
@@ -1959,15 +1953,15 @@ table.data-table tr:last-child td { border-bottom: none; }
 // group: 'dock' = bottom nav, 'menu' = sidebar drawer, 'fab' = floating + button
 const TABS = [
   { id: 'dashboard', label: 'Home',       icon: 'home', group: 'dock' },
-  { id: 'trades',    label: 'Trades',     icon: 'list', group: 'dock' },
   { id: 'stats',     label: 'Stats',      icon: 'bar',  group: 'dock' },
   { id: 'priority',  label: 'Setups',     icon: 'star', group: 'dock' },
   { id: 'journal',   label: 'Journal',    icon: 'book', group: 'dock' },
+  { id: 'reader',    label: 'Reader',     icon: 'read', group: 'dock' },
+  { id: 'trades',    label: 'Trades',     icon: 'list', group: 'hidden' },
   { id: 'entry',     label: 'New Trade',  icon: 'plus', group: 'fab' },
   { id: 'analytics', label: 'Analytics',  icon: 'bar',  group: 'menu' },
   { id: 'watchlist', label: 'Watchlist',  icon: 'eye',  group: 'menu' },
   { id: 'strategy',  label: 'Strategy',   icon: 'book', group: 'menu' },
-  { id: 'reader',    label: 'Reader',     icon: 'read', group: 'menu' },
   { id: 'settings',  label: 'Settings',   icon: 'cog',  group: 'menu' },
   { id: 'ai',        label: 'AI',         icon: 'ai',   group: 'hidden' },
 ];
@@ -2435,7 +2429,10 @@ function renderTabs() {
     `<button class="dock-btn" data-tab="${t.id}"><span class="dock-icon">${ICONS[t.icon] || ''}</span><span>${t.label}</span></button>`
   ).join('');
   dock.querySelectorAll('.dock-btn[data-tab]').forEach(btn => {
-    btn.onclick = () => switchTab(btn.dataset.tab);
+    // Reader keeps its popup menu (Home / Browser / Photos / Daily Brief), now
+    // anchored to the dock button instead of the old header icon.
+    if (btn.dataset.tab === 'reader') btn.onclick = (e) => openReaderMenu(e);
+    else btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
   // Sidebar drawer — secondary items
@@ -2458,6 +2455,8 @@ function headerBrandClick() {
 }
 
 function switchTab(tabId) {
+  // Trades now lives at the bottom of the Stats panel — route any old links there.
+  if (tabId === 'trades') tabId = 'stats';
   activeTab = tabId;
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById(`panel-${tabId}`);
@@ -2628,8 +2627,10 @@ function closeReaderMenu() {
 function openReaderMenu(e) {
   if (e) e.stopPropagation();
   if (document.getElementById('readerMenu')) { closeReaderMenu(); return; }
-  const btn = document.getElementById('readerBtn');
+  const btn = (e && e.currentTarget) || document.querySelector('.dock-btn[data-tab="reader"]') || document.getElementById('readerBtn');
+  if (!btn) return;
   const r = btn.getBoundingClientRect();
+  const openUp = r.top > window.innerHeight / 2; // dock sits at the bottom → open the menu upward
   const ic = {
     home: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>',
     browse: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.3 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.3-3.6-8.5S9.6 5.8 12 3.5Z"/></svg>',
@@ -2640,7 +2641,8 @@ function openReaderMenu(e) {
   menu.id = 'readerMenu';
   menu.className = 'header-menu open';
   menu.style.position = 'fixed';
-  menu.style.top = (r.bottom + 6) + 'px';
+  if (openUp) { menu.style.bottom = (window.innerHeight - r.top + 6) + 'px'; menu.style.top = 'auto'; }
+  else { menu.style.top = (r.bottom + 6) + 'px'; menu.style.bottom = 'auto'; }
   menu.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
   menu.style.left = 'auto';
   menu.style.width = '210px';
@@ -2724,26 +2726,39 @@ function updateMarketStatus() {
 async function fetchLivePrices(symbols) {
   if (!symbols || !symbols.length) return {};
   const suffix = state.settings.exchange === 'NSE' ? 'NS' : 'BO';
-  const tickers = symbols.map(s => `${encodeURIComponent(s)}.${suffix}`).join(',');
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const result = {};
-    (data.quoteResponse?.result || []).forEach(q => {
-      const sym = q.symbol.replace(`.${suffix}`, '');
-      result[sym] = {
-        price: q.regularMarketPrice,
-        change: q.regularMarketChange,
-        changePct: q.regularMarketChangePercent,
-        prevClose: q.regularMarketPreviousClose
-      };
-    });
-    return result;
-  } catch (e) {
-    return {};
+  // Yahoo blocks direct browser calls (CORS) and the v7 quote endpoint now needs
+  // a crumb/cookie. The v8 chart endpoint works crumb-free, so fetch it per
+  // symbol through the CORS proxy pool (first proxy that returns a price wins).
+  const proxies = [
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+    u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
+  ];
+  async function one(sym) {
+    const ticker = `${sym}.${suffix}`;
+    const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+    for (const p of proxies) {
+      try {
+        const res = await fetch(p(target));
+        if (!res.ok) continue;
+        const data = await res.json();
+        const meta = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
+        const price = meta && (typeof meta.regularMarketPrice === 'number' ? meta.regularMarketPrice : null);
+        if (price == null) continue;
+        const prev = (typeof meta.chartPreviousClose === 'number' ? meta.chartPreviousClose
+                    : typeof meta.previousClose === 'number' ? meta.previousClose : price);
+        return [sym, { price, change: price - prev, changePct: prev ? ((price - prev) / prev) * 100 : 0, prevClose: prev }];
+      } catch (e) {}
+    }
+    return null;
   }
+  const out = {};
+  const batchSize = 6; // gentle on the free proxies
+  for (let i = 0; i < symbols.length; i += batchSize) {
+    const results = await Promise.all(symbols.slice(i, i + batchSize).map(one));
+    results.forEach(r => { if (r) out[r[0]] = r[1]; });
+  }
+  return out;
 }
 
 async function refreshAllPrices(opts) {
@@ -3021,9 +3036,17 @@ function toggleHomeSection(key) {
 
 function renderDashboard() {
   const sec = loadHomeSections();
+  const openTrades = (state.trades || []).filter(t => t.status === 'open');
+  const coreItems = state.portfolio || [];
+  const addBtn = `<button class="btn btn-sm" onclick="event.stopPropagation(); switchTab('entry')">+ Add</button>`;
+  // Satellite and Core are now independent, separately collapsible sections.
+  // When there are no holdings at all, fall back to the single combined card.
+  const holdingsBlock = (!openTrades.length && !coreItems.length)
+    ? homeSection('holdings', 'Current Holdings', currentHoldingsHTML(), addBtn, sec.holdings)
+    : homeSection('holdings-sat', `Satellite — Open <span class="hs-count">${openTrades.length}</span>`, satelliteHoldingsBody(), addBtn, sec['holdings-sat'])
+      + homeSection('holdings-core', `Core Holdings <span class="hs-count">${coreItems.length}</span>`, coreHoldingsBody(), addBtn, sec['holdings-core']);
   document.getElementById('panel-dashboard').innerHTML = `
-    ${homeSection('holdings', 'Current Holdings', currentHoldingsHTML(),
-      `<button class="btn btn-sm" onclick="event.stopPropagation(); switchTab('entry')">+ Add</button>`, sec.holdings)}
+    ${holdingsBlock}
     ${homeSection('priority', 'Priority Setups', priorityBodyHTML(),
       `<button class="btn btn-sm" onclick="event.stopPropagation(); openPriorityModal()">+ Add Setup</button>`, sec.priority)}
     ${homeSection('watchlist', 'Watchlist', watchlistBodyHTML('wlCardsHome'),
@@ -3266,14 +3289,15 @@ function loadHomeNews() {
 }
 
 // Unrealized totals across open satellite trades + core holdings.
-function holdingsTotals() {
+// scope: 'core' | 'satellite' | undefined (= both)
+function holdingsTotals(scope) {
   let invested = 0, current = 0;
-  (state.portfolio || []).forEach(p => {
+  if (scope !== 'satellite') (state.portfolio || []).forEach(p => {
     const live = window.livePrices[p.symbol];
     const inv = Number(p.qty) * Number(p.avgPrice);
     invested += inv; current += live ? Number(p.qty) * live.price : inv;
   });
-  (state.trades || []).filter(t => t.status === 'open').forEach(t => {
+  if (scope !== 'core') (state.trades || []).filter(t => t.status === 'open').forEach(t => {
     const live = window.livePrices[t.symbol];
     const inv = Number(t.entryQty) * Number(t.entryPrice);
     invested += inv; current += live ? Number(t.entryQty) * live.price : inv;
@@ -3282,19 +3306,47 @@ function holdingsTotals() {
   const pct = invested ? (pnl / invested) * 100 : 0;
   return { invested, current, pnl, pct };
 }
-function holdingsSummaryHTML() {
-  const t = holdingsTotals();
+function holdingsSummaryHTML(scope, pnlId) {
+  const t = holdingsTotals(scope);
   return `<div class="holdings-summary">
     <div><div class="hs-label">Invested</div><div class="mono hs-val">${formatINR(t.invested)}</div></div>
-    <div><div class="hs-label">Unrealized P&amp;L</div><div class="mono hs-val ${pnlClass(t.pnl)}" id="homeHoldingsPnl">${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span></div></div>
+    <div><div class="hs-label">Unrealized P&amp;L</div><div class="mono hs-val ${pnlClass(t.pnl)}" id="${pnlId || 'homeHoldingsPnl'}">${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span></div></div>
   </div>`;
 }
 function updateHoldingsSummary() {
-  const el = document.getElementById('homeHoldingsPnl');
-  if (!el) return;
-  const t = holdingsTotals();
-  el.innerHTML = `${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span>`;
-  setPnlClass(el, t.pnl);
+  [['homeHoldingsPnl', undefined], ['homeHoldingsPnlSat', 'satellite'], ['homeHoldingsPnlCore', 'core']].forEach(([id, scope]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const t = holdingsTotals(scope);
+    el.innerHTML = `${formatPnl(t.pnl)} <span style="font-size:11px;">(${t.pct >= 0 ? '+' : ''}${t.pct.toFixed(2)}%)</span>`;
+    setPnlClass(el, t.pnl);
+  });
+}
+// Independent Satellite / Core holdings bodies for the homepage, each with its
+// own subtotal and a symbol filter (shown once there are enough rows to need it).
+function filterHoldingsList(inputEl, listId) {
+  const q = inputEl.value.trim().toLowerCase();
+  const list = document.getElementById(listId);
+  if (!list) return;
+  list.querySelectorAll('.trade-card').forEach(card => {
+    const symEl = card.querySelector('.trade-symbol');
+    const sym = (symEl ? symEl.textContent : '').toLowerCase();
+    card.style.display = (!q || sym.includes(q)) ? '' : 'none';
+  });
+}
+function satelliteHoldingsBody() {
+  const openTrades = (state.trades || []).filter(t => t.status === 'open');
+  if (!openTrades.length) return `<div class="holdings-empty">No open satellite trades</div>`;
+  const search = openTrades.length > 3 ? `<input class="holdings-search" type="search" placeholder="Filter satellite…" oninput="filterHoldingsList(this,'satHoldingsList')">` : '';
+  return holdingsSummaryHTML('satellite', 'homeHoldingsPnlSat') + search +
+    `<div id="satHoldingsList">${openTrades.map(t => renderTradeCard(t)).join('')}</div>`;
+}
+function coreHoldingsBody() {
+  const coreItems = state.portfolio || [];
+  if (!coreItems.length) return `<div class="holdings-empty">No core holdings</div>`;
+  const search = coreItems.length > 3 ? `<input class="holdings-search" type="search" placeholder="Filter core…" oninput="filterHoldingsList(this,'coreHoldingsList')">` : '';
+  return holdingsSummaryHTML('core', 'homeHoldingsPnlCore') + search +
+    `<div id="coreHoldingsList">${coreItems.map(p => coreHoldingCard(p)).join('')}</div>`;
 }
 
 // Current Holdings: two sub-sections (Satellite-open, Core) in the trade-card style.
@@ -3474,7 +3526,7 @@ function renderStats() {
     <div class="card" style="margin-top: 14px;">
       <div class="card-header">
         <h3 class="card-title">Latest Trades</h3>
-        <button class="btn-ghost btn btn-sm" onclick="switchTab('trades')">See all →</button>
+        <button class="btn-ghost btn btn-sm" onclick="document.getElementById('tradesHost')&&document.getElementById('tradesHost').scrollIntoView({behavior:'smooth'})">See all →</button>
       </div>
       ${latest.length ? latest.map(t => {
         const np = netPnl(t);
@@ -3499,7 +3551,10 @@ function renderStats() {
         `;
       }).join('') : '<div style="color: var(--text-muted); padding: 24px 0; text-align: center; font-size: 13px;">No closed trades in this period</div>'}
     </div>
+
+    <div id="tradesHost" style="margin-top: 28px; padding-top: 4px; border-top: 1px solid var(--border-subtle);"></div>
   `;
+  renderTrades(); // Trades section now lives at the bottom of Stats
 }
 
 function setDashboardRange(r) { dashboardRange = r; renderStats(); }
@@ -3547,7 +3602,7 @@ function journalDailyHTML() {
     const losses = trades.filter(t => netPnl(t) < 0).length;
     const wr = trades.length ? Math.round(wins / trades.length * 100) : 0;
     const note = (state.journalNotes || {})[key];
-    const pills = trades.map(t => `<span class="pill ${netPnl(t) >= 0 ? 'win' : 'loss'}">${escapeHtml(t.symbol)}</span>`).join('');
+    const pills = trades.map(t => `<span class="pill ${netPnl(t) >= 0 ? 'win' : 'loss'}" style="cursor:pointer;" onclick="openJournalTrade('${t.id}')" title="Open trade">${escapeHtml(t.symbol)}</span>`).join('');
     return `
       <div class="jcard">
         <div class="jcard-date">
@@ -3720,6 +3775,30 @@ function shortMoney(n) {
 }
 
 // ---- Journal day detail + notes ----
+// Open the trade behind a journal label/pill. Satellite trades open the full
+// edit modal; core-closed records (which aren't in state.trades) get a read-only
+// detail modal.
+function openJournalTrade(id) {
+  if (!id) return;
+  const t = (state.trades || []).find(x => x.id === id);
+  if (t) { openEditTradeModal(id); return; }
+  const c = (state.coreClosed || []).find(x => x.id === id);
+  if (!c) return;
+  const np = netPnl(c), pct = tradeGainPct(c);
+  const qty = c.entryQty || c.qty || c.exitQty || '';
+  const buy = (c.entryPrice != null ? c.entryPrice : c.avgPrice);
+  const body = `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="jg-row"><span>Symbol</span><span class="mono">${escapeHtml(c.symbol)}</span></div>
+      ${qty !== '' ? `<div class="jg-row"><span>Quantity</span><span>${escapeHtml(String(qty))}</span></div>` : ''}
+      ${buy != null ? `<div class="jg-row"><span>Avg Buy</span><span>${formatINR(buy)}</span></div>` : ''}
+      ${c.exitPrice != null ? `<div class="jg-row"><span>Exit</span><span>${formatINR(c.exitPrice)}</span></div>` : ''}
+      <div class="jg-row"><span>Net P&amp;L</span><span class="${pnlClass(np)}">${formatPnl(np)}${pct != null ? ` (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)` : ''}</span></div>
+      ${c.closedAt ? `<div class="jg-row"><span>Closed</span><span>${formatDate(c.closedAt)}</span></div>` : ''}
+    </div>`;
+  showModal({ title: `${escapeHtml(c.symbol)} · Core (closed)`, body });
+}
+
 function openDayTrades(key) {
   const trades = allClosedTrades().filter(t => dayKey(t.closedAt) === key)
     .sort((a, b) => new Date(a.closedAt) - new Date(b.closedAt));
@@ -3764,11 +3843,15 @@ function openDayNote(key) {
    TRADES
    ======================================================================== */
 function renderTrades() {
+  // Trades render into a host inside the Stats panel (its dock tab was removed);
+  // fall back to the legacy panel element if that host isn't mounted.
+  const host = document.getElementById('tradesHost') || document.getElementById('panel-trades');
+  if (!host) return;
   const allTags = new Set();
   state.trades.forEach(t => (t.tags || []).forEach(tag => allTags.add(tag)));
   const tags = [...allTags].sort();
 
-  document.getElementById('panel-trades').innerHTML = `
+  host.innerHTML = `
     <div class="page-header">
       <div>
         <h1 class="page-title">Trades</h1>
@@ -7851,13 +7934,11 @@ async function init() {
   setInterval(updateMarketStatus, 1000);
   setupAutoRefresh();
   document.getElementById('searchBtn').onclick = openSearchModal;
-  document.getElementById('readerBtn').onclick = openReaderMenu;
   document.getElementById('themeToggleBtn').onclick = toggleTheme;
   document.getElementById('menuBtn').onclick = openDrawer;
   document.getElementById('drawerCloseBtn').onclick = closeDrawer;
   document.getElementById('drawerOverlay').onclick = closeDrawer;
   document.getElementById('aiBtn').onclick = onAiClick;
-  document.getElementById('readerArrowBtn').onclick = () => switchTab('reader');
   // Close the header dropdown when clicking anywhere outside it
   document.addEventListener('click', (e) => {
     const menu = document.getElementById('headerMenu');
