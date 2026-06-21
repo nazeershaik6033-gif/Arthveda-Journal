@@ -2070,6 +2070,8 @@ let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 let activeTab = 'dashboard';
 let activeSubTab = { trades: 'satellite-open', wl: 'w1' };
 let tradeFilter = { tags: [], openMenu: null, sort: { key: 'date', dir: 'desc' } };
+// Multi-select for Satellite / Core lists: { on, ids: { tradeId: 'satellite'|'core' } }
+let tradeSelect = { on: false, ids: {} };
 let calendarMonth = new Date();
 let calendarFilter = 'all';
 let journalView = 'daily';        // daily | monthly | calendar
@@ -3337,16 +3339,16 @@ function filterHoldingsList(inputEl, listId) {
 function satelliteHoldingsBody() {
   const openTrades = (state.trades || []).filter(t => t.status === 'open');
   if (!openTrades.length) return `<div class="holdings-empty">No open satellite trades</div>`;
-  const search = openTrades.length > 3 ? `<input class="holdings-search" type="search" placeholder="Filter satellite…" oninput="filterHoldingsList(this,'satHoldingsList')">` : '';
-  return holdingsSummaryHTML('satellite', 'homeHoldingsPnlSat') + search +
-    `<div id="satHoldingsList">${openTrades.map(t => renderTradeCard(t)).join('')}</div>`;
+  const search = (!tradeSelect.on && openTrades.length > 3) ? `<input class="holdings-search" type="search" placeholder="Filter satellite…" oninput="filterHoldingsList(this,'satHoldingsList')">` : '';
+  return holdingsSummaryHTML('satellite', 'homeHoldingsPnlSat') + mselBar('satellite', true) + search +
+    `<div id="satHoldingsList">${openTrades.map(t => wrapSelectable(t.id, 'satellite', renderTradeCard(t))).join('')}</div>`;
 }
 function coreHoldingsBody() {
   const coreItems = state.portfolio || [];
   if (!coreItems.length) return `<div class="holdings-empty">No core holdings</div>`;
-  const search = coreItems.length > 3 ? `<input class="holdings-search" type="search" placeholder="Filter core…" oninput="filterHoldingsList(this,'coreHoldingsList')">` : '';
-  return holdingsSummaryHTML('core', 'homeHoldingsPnlCore') + search +
-    `<div id="coreHoldingsList">${coreItems.map(p => coreHoldingCard(p)).join('')}</div>`;
+  const search = (!tradeSelect.on && coreItems.length > 3) ? `<input class="holdings-search" type="search" placeholder="Filter core…" oninput="filterHoldingsList(this,'coreHoldingsList')">` : '';
+  return holdingsSummaryHTML('core', 'homeHoldingsPnlCore') + mselBar('core', true) + search +
+    `<div id="coreHoldingsList">${coreItems.map(p => wrapSelectable(p.id, 'core', coreHoldingCard(p))).join('')}</div>`;
 }
 
 // Current Holdings: two sub-sections (Satellite-open, Core) in the trade-card style.
@@ -3875,7 +3877,7 @@ function renderTrades() {
 
 function setSubTab(group, value) {
   activeSubTab[group] = value;
-  if (group === 'trades') renderTrades();
+  if (group === 'trades') { tradeSelect = { on: false, ids: {} }; renderTrades(); }
   // 'wl' tabs live on both the Watchlist panel and the homepage section, so
   // re-render whichever panel is currently active.
   if (group === 'wl') renderActivePanel();
@@ -3944,7 +3946,8 @@ function renderTradesContent(tags) {
           <div class="stat-card"><div class="stat-label">Closed Records</div><div class="stat-value">${trades.length}</div></div>
           <div class="stat-card"><div class="stat-label">Total Realized P&amp;L</div><div class="stat-value ${pnlClass(totalPnl)}">${formatPnl(totalPnl)}</div></div>
         </div>
-        ${trades.map(t => `
+        ${mselBar('satellite', false)}
+        ${trades.map(t => wrapSelectable(t.id, 'satellite', `
           <div class="trade-card animate-fade-up">
             <div class="trade-header">
               <div>
@@ -3979,10 +3982,11 @@ ${escapeHtml(t.exitDesc)}</div>` : ''}
               <button class="btn btn-danger btn-sm" onclick="deleteTradePrompt('${t.id}')">Delete</button>
             </div>
           </div>
-        `).join('')}
+        `)).join('')}
       `;
     } else {
-      html += trades.map(t => renderTradeCard(t)).join('');
+      html += mselBar('satellite', true);
+      html += trades.map(t => wrapSelectable(t.id, 'satellite', renderTradeCard(t))).join('');
     }
   }
   container.innerHTML = html;
@@ -4001,6 +4005,136 @@ function setSortKey(key) {
   else { tradeFilter.sort.key = key; tradeFilter.sort.dir = 'desc'; }
   tradeFilter.openMenu = null; // sort is single-pick: close after choosing
   renderTrades();
+}
+
+/* ========================================================================
+   MULTI-SELECT for Satellite / Core lists — Close · Move · Export · Delete
+   ======================================================================== */
+const mr2 = x => Math.round((Number(x) || 0) * 100) / 100;
+function mselToggle(on) { tradeSelect.on = on; if (!on) tradeSelect.ids = {}; renderActivePanel(); }
+function toggleMsel(id, kind) {
+  if (tradeSelect.ids[id]) delete tradeSelect.ids[id]; else tradeSelect.ids[id] = kind;
+  renderActivePanel();
+}
+// Wrap a card in a selectable row (checkbox + inert card) when select mode is on.
+function wrapSelectable(id, kind, cardHtml) {
+  if (!tradeSelect.on) return cardHtml;
+  const on = !!tradeSelect.ids[id];
+  return `<div onclick="toggleMsel('${id}','${kind}')" style="position:relative;cursor:pointer;padding-left:38px;">
+    <div style="position:absolute;left:6px;top:20px;width:22px;height:22px;border-radius:6px;border:2px solid ${on ? 'var(--accent,#3b82f6)' : 'var(--border)'};background:${on ? 'var(--accent,#3b82f6)' : 'transparent'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;z-index:2;">${on ? '✓' : ''}</div>
+    <div style="pointer-events:none;">${cardHtml}</div>
+  </div>`;
+}
+// The Select button / bulk-action bar shown above a list. canClose = open positions.
+function mselBar(kind, canClose) {
+  if (!tradeSelect.on) {
+    return `<div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-ghost btn-sm" onclick="mselToggle(true)">☑ Select</button></div>`;
+  }
+  const n = Object.keys(tradeSelect.ids).length, dis = n ? '' : 'disabled';
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;padding:8px 10px;background:var(--surface-3);border:1px solid var(--border);border-radius:10px;">
+    <span style="font-size:13px;font-weight:600;">${n} selected</span>
+    <div style="flex:1;"></div>
+    ${canClose ? `<button class="btn btn-success btn-sm" ${dis} onclick="mselClose()">Close</button>` : ''}
+    <button class="btn btn-ghost btn-sm" ${dis} onclick="mselMove('${kind}')">${kind === 'core' ? '→ Satellite' : '→ Core'}</button>
+    <button class="btn btn-ghost btn-sm" ${dis} onclick="mselExport()">Export</button>
+    <button class="btn btn-danger btn-sm" ${dis} onclick="mselDelete()">Delete</button>
+    <button class="btn btn-ghost btn-sm" onclick="mselToggle(false)">Done</button>
+  </div>`;
+}
+function mselClose() {
+  const entries = Object.entries(tradeSelect.ids);
+  if (!entries.length) return;
+  showConfirm('Close selected', `Close ${entries.length} position(s) at the current live price?`, async () => {
+    const now = new Date().toISOString();
+    let done = 0, skipped = 0;
+    entries.forEach(([id, kind]) => {
+      if (kind === 'satellite') {
+        const t = state.trades.find(x => x.id === id && x.status === 'open');
+        if (!t) return;
+        const live = window.livePrices[t.symbol];
+        if (!live || !live.price) { skipped++; return; }
+        const price = live.price, qty = Number(t.entryQty);
+        t.status = 'closed'; t.exitPrice = price; t.exitQty = qty; t.exitDate = now;
+        t.realizedPnl = mr2((price - Number(t.entryPrice)) * qty);
+        t.commission = mr2(estimateCommission(Number(t.entryPrice) * qty + price * qty));
+        t.closedAt = now; done++;
+      } else {
+        const p = state.portfolio.find(x => x.id === id);
+        if (!p) return;
+        const live = window.livePrices[p.symbol];
+        if (!live || !live.price) { skipped++; return; }
+        const price = live.price, qty = Number(p.qty);
+        if (!Array.isArray(state.coreClosed)) state.coreClosed = [];
+        state.coreClosed.push({
+          id: generateId(), symbol: p.symbol, category: p.category || 'stocks', tradeName: p.tradeName || '',
+          entryPrice: p.avgPrice, entryDate: p.addedAt || null, exitPrice: price, exitQty: qty,
+          realizedPnl: mr2((price - Number(p.avgPrice)) * qty),
+          commission: mr2(estimateCommission(Number(p.avgPrice) * qty + price * qty)),
+          closedAt: now, status: 'closed'
+        });
+        state.portfolio = state.portfolio.filter(x => x.id !== id); done++;
+      }
+    });
+    await saveState();
+    tradeSelect = { on: false, ids: {} };
+    showToast(`Closed ${done}${skipped ? `, skipped ${skipped} (no live price)` : ''}`, done ? 'success' : 'warning');
+    renderActivePanel();
+  }, 'Close at live price');
+}
+function mselMove(kind) {
+  const entries = Object.entries(tradeSelect.ids);
+  if (!entries.length) return;
+  showConfirm('Move selected', `Move ${entries.length} item(s) between Core and Satellite?`, async () => {
+    const now = new Date().toISOString();
+    entries.forEach(([id, k]) => {
+      if (k === 'satellite') {
+        const t = state.trades.find(x => x.id === id && x.status === 'open');
+        if (!t) return;
+        state.portfolio.push({ id: generateId(), symbol: t.symbol, tradeName: t.tradeName || '', qty: t.entryQty, avgPrice: t.entryPrice, category: t.category || 'stocks', addedAt: t.entryDate || now });
+        state.trades = state.trades.filter(x => x.id !== id);
+      } else {
+        const p = state.portfolio.find(x => x.id === id);
+        if (!p) return;
+        state.trades.push({ id: generateId(), portfolioType: 'satellite', status: 'open', category: p.category || 'stocks', symbol: p.symbol, tradeName: p.tradeName || '', entryPrice: p.avgPrice, entryQty: p.qty, entryDate: p.addedAt || now, entryDesc: '', tags: [], createdAt: now });
+        state.portfolio = state.portfolio.filter(x => x.id !== id);
+      }
+    });
+    await saveState();
+    tradeSelect = { on: false, ids: {} };
+    showToast(`Moved ${entries.length} item(s)`, 'success');
+    renderActivePanel();
+  }, 'Move', 'btn-primary');
+}
+function mselDelete() {
+  const entries = Object.entries(tradeSelect.ids);
+  if (!entries.length) return;
+  showConfirm('Delete selected', `Permanently delete ${entries.length} item(s)? This can't be undone.`, async () => {
+    entries.forEach(([id, kind]) => {
+      if (kind === 'core') state.portfolio = state.portfolio.filter(x => x.id !== id);
+      else { state.trades = state.trades.filter(x => x.id !== id); state.coreClosed = (state.coreClosed || []).filter(x => x.id !== id); }
+    });
+    await saveState();
+    tradeSelect = { on: false, ids: {} };
+    showToast(`Deleted ${entries.length} item(s)`, 'info');
+    renderActivePanel();
+  }, 'Delete');
+}
+function mselExport() {
+  const entries = Object.entries(tradeSelect.ids);
+  if (!entries.length) return;
+  const rows = [['Symbol', 'Bucket', 'Status', 'Qty', 'Entry/Avg', 'Exit', 'Realized P&L']];
+  entries.forEach(([id, kind]) => {
+    if (kind === 'core') { const p = state.portfolio.find(x => x.id === id); if (p) rows.push([p.symbol, 'Core', 'open', p.qty, p.avgPrice, '', '']); }
+    else { const t = state.trades.find(x => x.id === id); if (t) rows.push([t.symbol, 'Satellite', t.status, t.exitQty || t.entryQty, t.entryPrice, t.exitPrice || '', t.realizedPnl != null ? t.realizedPnl : '']); }
+  });
+  const csv = rows.map(r => r.map(c => { c = String(c == null ? '' : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'naztrades-export.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast(`Exported ${entries.length} item(s)`, 'success');
 }
 
 function renderTradeCard(t) {
@@ -4076,7 +4210,7 @@ function renderCorePortfolio() {
     const pnlPct = invested ? (pnl / invested) * 100 : 0;
     totalInvested += invested;
     totalCurrent += current;
-    return `
+    return wrapSelectable(p.id, 'core', `
       <div class="trade-card">
         <div class="trade-header">
           <div>
@@ -4102,7 +4236,7 @@ function renderCorePortfolio() {
           <button class="btn btn-danger btn-sm" onclick="deletePortfolioPrompt('${p.id}')">Delete</button>
         </div>
       </div>
-    `;
+    `);
   }).join('');
 
   const totalPnl = totalCurrent - totalInvested;
@@ -4115,6 +4249,7 @@ function renderCorePortfolio() {
       <div class="stat-card"><div class="stat-label">P&L</div><div class="stat-value ${pnlClass(totalPnl)}">${formatPnl(totalPnl)}</div><div class="stat-meta">${totalPct.toFixed(2)}%</div></div>
       <div class="stat-card"><div class="stat-label">Holdings</div><div class="stat-value">${state.portfolio.length}</div></div>
     </div>
+    ${mselBar('core', true)}
     ${rows}
   `;
 }
