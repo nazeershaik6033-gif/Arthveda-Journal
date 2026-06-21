@@ -981,6 +981,97 @@ input[type=range].font-slider::-moz-range-thumb {
   margin: 8px 0 4px;
 }
 
+/* Inline search bar */
+.inline-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.inline-search {
+  position: relative;
+  flex: 1;
+}
+.inline-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-subtle);
+  pointer-events: none;
+  display: flex;
+}
+.inline-search-input {
+  width: 100%;
+  padding: 8px 32px 8px 34px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.inline-search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+.inline-search-input::placeholder { color: var(--text-subtle); }
+.inline-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.inline-search-clear:hover { color: var(--text); background: var(--surface-3); }
+
+/* Global search modal redesign */
+.search-modal-input-wrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+.search-modal-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-subtle);
+  pointer-events: none;
+  display: flex;
+}
+.search-modal-input {
+  width: 100%;
+  padding: 12px 16px 12px 40px;
+  background: var(--surface-3);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: var(--font-sans);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.search-modal-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+}
+.search-modal-input::placeholder { color: var(--text-muted); }
+
 /* Table */
 .table-wrap { overflow-x: auto; }
 table.data-table {
@@ -1221,7 +1312,9 @@ const DEFAULT_STATE = {
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 let activeTab = 'dashboard';
 let activeSubTab = { trades: 'satellite-open', wl: 'w1' };
-let tradeFilter = { tag: null, sort: { key: 'date', dir: 'desc' } };
+let tradeFilter = { tag: null, sort: { key: 'date', dir: 'desc' }, search: '' };
+let wlSearch = '';
+let prioritySearch = '';
 let calendarMonth = new Date();
 let calendarFilter = 'all';
 window.livePrices = {};
@@ -1588,11 +1681,8 @@ async function fetchLivePrices(symbols) {
   if (!symbols || !symbols.length) return {};
   const suffix = state.settings.exchange === 'NSE' ? 'NS' : 'BO';
   const tickers = symbols.map(s => `${encodeURIComponent(s)}.${suffix}`).join(',');
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+
+  const parseYahooData = (data) => {
     const result = {};
     (data.quoteResponse?.result || []).forEach(q => {
       const sym = q.symbol.replace(`.${suffix}`, '');
@@ -1604,9 +1694,32 @@ async function fetchLivePrices(symbols) {
       };
     });
     return result;
-  } catch (e) {
-    return {};
-  }
+  };
+
+  // Try direct Yahoo Finance first
+  try {
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers}`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (res.ok) {
+      const data = await res.json();
+      const result = parseYahooData(data);
+      if (Object.keys(result).length) return result;
+    }
+  } catch (e) {}
+
+  // Fallback: CORS proxy
+  try {
+    const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers}`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
+    const res = await fetch(proxyUrl);
+    if (res.ok) {
+      const wrapper = await res.json();
+      const data = JSON.parse(wrapper.contents);
+      return parseYahooData(data);
+    }
+  } catch (e) {}
+
+  return {};
 }
 
 async function refreshAllPrices() {
@@ -1785,6 +1898,16 @@ function renderTrades() {
       <button class="sub-tab-btn ${activeSubTab.trades === 'core-closed' ? 'active' : ''}" onclick="setSubTab('trades','core-closed')">Core Closed</button>
     </div>
 
+    <div class="inline-search-wrap">
+      <div class="inline-search">
+        <span class="inline-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </span>
+        <input class="inline-search-input" id="tradeSearchInput" placeholder="Search by symbol…" value="${escapeHtml(tradeFilter.search)}" oninput="setTradeSearch(this.value)" autocomplete="off" spellcheck="false">
+        ${tradeFilter.search ? `<button class="inline-search-clear" onclick="setTradeSearch('')" title="Clear search">×</button>` : ''}
+      </div>
+    </div>
+
     <div id="tradesContent"></div>
   `;
 
@@ -1793,8 +1916,32 @@ function renderTrades() {
 
 function setSubTab(group, value) {
   activeSubTab[group] = value;
-  if (group === 'trades') renderTrades();
-  if (group === 'wl') renderWatchlist();
+  if (group === 'trades') { tradeFilter.search = ''; renderTrades(); }
+  if (group === 'wl') { wlSearch = ''; renderWatchlist(); }
+}
+
+function setTradeSearch(q) {
+  tradeFilter.search = q || '';
+  const allTags = new Set();
+  state.trades.forEach(t => (t.tags || []).forEach(tag => allTags.add(tag)));
+  renderTradesContent([...allTags].sort());
+  const inp = document.getElementById('tradeSearchInput');
+  if (inp) {
+    inp.focus();
+    try { inp.setSelectionRange(q.length, q.length); } catch(e){}
+    const parent = inp.parentElement;
+    let clearBtn = parent && parent.querySelector('.inline-search-clear');
+    if (q && !clearBtn && parent) {
+      clearBtn = document.createElement('button');
+      clearBtn.className = 'inline-search-clear';
+      clearBtn.title = 'Clear search';
+      clearBtn.textContent = '×';
+      clearBtn.onclick = () => setTradeSearch('');
+      parent.appendChild(clearBtn);
+    } else if (!q && clearBtn) {
+      clearBtn.remove();
+    }
+  }
 }
 
 function renderTradesContent(tags) {
@@ -1810,6 +1957,10 @@ function renderTradesContent(tags) {
   const status = activeSubTab.trades === 'satellite-open' ? 'open' : 'closed';
   let trades = state.trades.filter(t => t.portfolioType === 'satellite' && t.status === status);
   if (tradeFilter.tag) trades = trades.filter(t => (t.tags || []).includes(tradeFilter.tag));
+  if (tradeFilter.search) {
+    const q = tradeFilter.search.toLowerCase();
+    trades = trades.filter(t => (t.symbol || '').toLowerCase().includes(q) || (t.tradeName || '').toLowerCase().includes(q));
+  }
 
   // Sort
   const sortKey = tradeFilter.sort.key, dir = tradeFilter.sort.dir === 'desc' ? -1 : 1;
@@ -1843,12 +1994,16 @@ function renderTradesContent(tags) {
   </div>`;
 
   if (!trades.length) {
-    html += `<div class="empty-state">
-      <div class="empty-state-icon">📊</div>
-      <div class="empty-state-title">No ${status} trades</div>
-      <div class="empty-state-desc">${status === 'open' ? 'Add your first trade to get started.' : 'Closed satellite trades will appear here.'}</div>
-      <button class="btn" onclick="switchTab('entry')">+ Add Trade</button>
-    </div>`;
+    if (tradeFilter.search || tradeFilter.tag) {
+      html += `<div style="color: var(--text-muted); padding: 20px 0; text-align: center; font-size: 13px;">No trades match your filter${tradeFilter.search ? ` for "${escapeHtml(tradeFilter.search)}"` : ''}.</div>`;
+    } else {
+      html += `<div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <div class="empty-state-title">No ${status} trades</div>
+        <div class="empty-state-desc">${status === 'open' ? 'Add your first trade to get started.' : 'Closed satellite trades will appear here.'}</div>
+        <button class="btn" onclick="switchTab('entry')">+ Add Trade</button>
+      </div>`;
+    }
   } else {
     html += trades.map(t => renderTradeCard(t)).join('');
   }
@@ -1925,8 +2080,10 @@ function renderCorePortfolio() {
       <button class="btn" onclick="switchTab('entry')">+ Add Core Holding</button>
     </div>`;
   }
+  const sq = (tradeFilter.search || '').toLowerCase();
+  const filtered = sq ? state.portfolio.filter(p => (p.symbol||'').toLowerCase().includes(sq) || (p.tradeName||'').toLowerCase().includes(sq)) : state.portfolio;
   let totalInvested = 0, totalCurrent = 0;
-  const rows = state.portfolio.map(p => {
+  const rows = filtered.map(p => {
     const live = window.livePrices[p.symbol];
     const invested = Number(p.qty) * Number(p.avgPrice);
     const current = live ? Number(p.qty) * live.price : invested;
@@ -1965,6 +2122,8 @@ function renderCorePortfolio() {
   const totalPnl = totalCurrent - totalInvested;
   const totalPct = totalInvested ? (totalPnl / totalInvested) * 100 : 0;
 
+  const noResults = sq && !filtered.length ? `<div style="color: var(--text-muted); padding: 20px 0; text-align: center; font-size: 13px;">No holdings match "${escapeHtml(sq)}"</div>` : '';
+
   return `
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">Invested</div><div class="stat-value">${formatINR(totalInvested)}</div></div>
@@ -1972,7 +2131,7 @@ function renderCorePortfolio() {
       <div class="stat-card"><div class="stat-label">P&L</div><div class="stat-value ${pnlClass(totalPnl)}">${formatPnl(totalPnl)}</div><div class="stat-meta">${totalPct.toFixed(2)}%</div></div>
       <div class="stat-card"><div class="stat-label">Holdings</div><div class="stat-value">${state.portfolio.length}</div></div>
     </div>
-    ${rows}
+    ${noResults}${rows}
   `;
 }
 
@@ -1980,7 +2139,7 @@ function renderCorePortfolio() {
    CORE CLOSED LIST + CLOSE CORE HOLDING
    ======================================================================== */
 function renderCoreClosedList() {
-  const items = (state.coreClosed || []).slice().sort((a, b) => new Date(b.closedAt || 0) - new Date(a.closedAt || 0));
+  let items = (state.coreClosed || []).slice().sort((a, b) => new Date(b.closedAt || 0) - new Date(a.closedAt || 0));
   if (!items.length) {
     return `<div class="empty-state">
       <div class="empty-state-icon">📦</div>
@@ -1988,12 +2147,16 @@ function renderCoreClosedList() {
       <div class="empty-state-desc">Sold long-term holdings will appear here.</div>
     </div>`;
   }
+  const sq = (tradeFilter.search || '').toLowerCase();
+  if (sq) items = items.filter(i => (i.symbol||'').toLowerCase().includes(sq) || (i.tradeName||'').toLowerCase().includes(sq));
   const totalPnl = items.reduce((s, i) => s + (Number(i.realizedPnl) || 0), 0);
+  const noResultsMsg = sq && !items.length ? `<div style="color: var(--text-muted); padding: 20px 0; text-align: center; font-size: 13px;">No records match "${escapeHtml(sq)}"</div>` : '';
   return `
     <div class="stat-grid" style="margin-bottom: 12px;">
       <div class="stat-card"><div class="stat-label">Closed Records</div><div class="stat-value">${items.length}</div></div>
       <div class="stat-card"><div class="stat-label">Total Realized P&L</div><div class="stat-value ${pnlClass(totalPnl)}">${formatPnl(totalPnl)}</div></div>
     </div>
+    ${noResultsMsg}
     ${items.map(item => `
       <div class="trade-card animate-fade-up">
         <div class="trade-header">
@@ -2588,8 +2751,19 @@ function openImageLightbox(src) {
 /* ========================================================================
    PRIORITY
    ======================================================================== */
+function setPrioritySearch(q) {
+  prioritySearch = q || '';
+  renderPriority();
+  const inp = document.getElementById('prioritySearchInput');
+  if (inp) { inp.focus(); try { inp.setSelectionRange(q.length, q.length); } catch(e){} }
+}
+
 function renderPriority() {
-  const items = [...state.priority].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  let items = [...state.priority].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  if (prioritySearch) {
+    const q = prioritySearch.toLowerCase();
+    items = items.filter(p => (p.symbol||'').toLowerCase().includes(q) || (p.setup||'').toLowerCase().includes(q) || (p.notes||'').toLowerCase().includes(q));
+  }
   document.getElementById('panel-priority').innerHTML = `
     <div class="page-header">
       <div>
@@ -2598,6 +2772,17 @@ function renderPriority() {
       </div>
       <button class="btn btn-sm" onclick="openPriorityModal()">+ Add Setup</button>
     </div>
+
+    <div class="inline-search-wrap">
+      <div class="inline-search">
+        <span class="inline-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </span>
+        <input class="inline-search-input" id="prioritySearchInput" placeholder="Search by symbol or setup…" value="${escapeHtml(prioritySearch)}" oninput="setPrioritySearch(this.value)" autocomplete="off" spellcheck="false">
+        ${prioritySearch ? `<button class="inline-search-clear" onclick="setPrioritySearch('')" title="Clear">×</button>` : ''}
+      </div>
+    </div>
+
     ${items.length ? items.map(p => {
       const rr = (p.trigger && p.target && p.sl) ?
         ((Number(p.target) - Number(p.trigger)) / Math.abs(Number(p.trigger) - Number(p.sl))).toFixed(2) : null;
@@ -2626,13 +2811,14 @@ function renderPriority() {
           </div>
         </div>
       `;
-    }).join('') : `
+    }).join('') : (prioritySearch ? `
+      <div style="color: var(--text-muted); padding: 20px 0; text-align: center; font-size: 13px;">No setups match "${escapeHtml(prioritySearch)}"</div>` : `
       <div class="empty-state">
         <div class="empty-state-icon">⭐</div>
         <div class="empty-state-title">No priority setups</div>
         <div class="empty-state-desc">Plan your trades with trigger, target, and SL before pulling the trigger.</div>
         <button class="btn" onclick="openPriorityModal()">+ Add Setup</button>
-      </div>`}
+      </div>`)}
   `;
 }
 
@@ -2718,6 +2904,13 @@ function deletePriorityPrompt(id) {
 /* ========================================================================
    WATCHLIST + GTT
    ======================================================================== */
+function setWlSearch(q) {
+  wlSearch = q || '';
+  renderWatchlist();
+  const inp = document.getElementById('wlSearchInput');
+  if (inp) { inp.focus(); try { inp.setSelectionRange(q.length, q.length); } catch(e){} }
+}
+
 function renderWatchlist() {
   if (!state.watchlists.length) {
     state.watchlists.push({ id: 'w1', name: 'Default', symbols: [] });
@@ -2726,6 +2919,9 @@ function renderWatchlist() {
     activeSubTab.wl = state.watchlists[0].id;
   }
   const active = state.watchlists.find(w => w.id === activeSubTab.wl);
+  const wlQ = wlSearch.toLowerCase();
+  const filteredSymbols = wlQ ? active.symbols.filter(s => (s.symbol||'').toLowerCase().includes(wlQ) || (s.notes||'').toLowerCase().includes(wlQ)) : active.symbols;
+
   document.getElementById('panel-watchlist').innerHTML = `
     <div class="page-header">
       <div>
@@ -2740,16 +2936,26 @@ function renderWatchlist() {
     <div class="wl-tabs">
       ${state.watchlists.map(w => `
         <div class="wl-tab ${w.id === active.id ? 'active' : ''}" onclick="setSubTab('wl','${w.id}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="opacity:0.6;flex-shrink:0;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
           ${escapeHtml(w.name)} <span style="opacity: 0.6;">(${w.symbols.length})</span>
         </div>
       `).join('')}
+    </div>
+    <div class="inline-search-wrap">
+      <div class="inline-search">
+        <span class="inline-search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </span>
+        <input class="inline-search-input" id="wlSearchInput" placeholder="Search symbols in this list…" value="${escapeHtml(wlSearch)}" oninput="setWlSearch(this.value)" autocomplete="off" spellcheck="false">
+        ${wlSearch ? `<button class="inline-search-clear" onclick="setWlSearch('')" title="Clear">×</button>` : ''}
+      </div>
     </div>
     <div class="btn-row" style="margin-bottom: 12px;">
       <button class="btn btn-sm" onclick="addWatchlistSymbolPrompt()">+ Add Symbol</button>
       <button class="btn btn-ghost btn-sm" onclick="renameWatchlistPrompt('${active.id}')">Rename</button>
       ${state.watchlists.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteWatchlistPrompt('${active.id}')">Delete List</button>` : ''}
     </div>
-    ${active.symbols.length ? active.symbols.map(s => {
+    ${active.symbols.length ? (filteredSymbols.length ? filteredSymbols.map(s => {
       const live = window.livePrices[s.symbol];
       return `
         <div class="trade-card">
@@ -2769,7 +2975,7 @@ function renderWatchlist() {
           </div>
         </div>
       `;
-    }).join('') : `
+    }).join('') : `<div style="color: var(--text-muted); padding: 20px 0; text-align: center; font-size: 13px;">No symbols match "${escapeHtml(wlSearch)}"</div>`) : `
       <div class="empty-state">
         <div class="empty-state-icon">👁</div>
         <div class="empty-state-title">No symbols in this list</div>
@@ -4014,12 +4220,18 @@ function openSearchModal() {
   showModal({
     title: 'Search',
     body: `
-      <input class="form-input" id="searchInput" placeholder="Search symbols, tags, notes..." autocomplete="off">
-      <div id="searchResults" style="margin-top: 12px; max-height: 50vh; overflow-y: auto;"></div>
+      <div class="search-modal-input-wrap">
+        <span class="search-modal-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </span>
+        <input class="search-modal-input" id="searchInput" placeholder="Search symbols, tags, notes..." autocomplete="off" spellcheck="false">
+      </div>
+      <div id="searchResults" style="max-height: 52vh; overflow-y: auto;"></div>
     `
   });
-  document.getElementById('searchInput').focus();
-  document.getElementById('searchInput').oninput = (e) => doSearch(e.target.value);
+  const inp = document.getElementById('searchInput');
+  inp.focus();
+  inp.oninput = (e) => doSearch(e.target.value);
   doSearch('');
 }
 

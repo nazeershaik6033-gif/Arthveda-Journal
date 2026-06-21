@@ -2220,10 +2220,14 @@ function App(){
     const files=Array.from(fileList||[]);if(!files.length)return;
     const recs=[];
     for(const f of files){
-      const rec={id:uid(),kind:f.type.startsWith('image/')?'image':'file',mime:f.type||'application/octet-stream',name:f.name||'Untitled',caption:'',albumId:null,favorite:false,pinned:false,addedAt:Date.now()+recs.length,blob:f};
-      try{await idbPut('media',rec);recs.push(rec)}catch(e){}
+      // Read file into an ArrayBuffer and re-wrap as Blob for reliable IDB storage
+      let blob=f;
+      try{const ab=await f.arrayBuffer();blob=new Blob([ab],{type:f.type||'application/octet-stream'});}catch(e){blob=f;}
+      const rec={id:uid(),kind:f.type.startsWith('image/')?'image':'file',mime:f.type||'application/octet-stream',name:f.name||'Untitled',caption:'',albumId:null,favorite:false,pinned:false,addedAt:Date.now()+recs.length,blob};
+      try{await idbPut('media',rec);recs.push(rec)}catch(e){console.error('addFiles idbPut failed',e);}
     }
     if(recs.length){setMedia(prev=>[...recs.reverse(),...prev]);toastFn(recs.length+(recs.length>1?' items added':' item added'))}
+    else if(files.length){toastFn('Failed to add — check storage permissions');}
   },[toastFn]);
   const updateMedia=useCallback(async(id,patch)=>{
     let updated=null;
