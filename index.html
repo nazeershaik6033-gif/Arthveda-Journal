@@ -1826,9 +1826,6 @@ table.data-table tr:last-child td { border-bottom: none; }
       <span class="header-brand-name">NazTrades</span>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" id="readerBtn" title="Reader" aria-label="Open Reader">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-      </button>
       <button class="icon-btn" id="aiBtn" title="AI" aria-label="AI">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/></svg>
       </button>
@@ -1837,9 +1834,6 @@ table.data-table tr:last-child td { border-bottom: none; }
       </button>
       <button class="icon-btn" id="themeToggleBtn" title="Change theme" aria-label="Change theme">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 3a9 9 0 0 0 0 18z"/></svg>
-      </button>
-      <button class="icon-btn" id="readerArrowBtn" title="Open Reader" aria-label="Open Reader">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
     </div>
   </div>
@@ -1959,15 +1953,15 @@ table.data-table tr:last-child td { border-bottom: none; }
 // group: 'dock' = bottom nav, 'menu' = sidebar drawer, 'fab' = floating + button
 const TABS = [
   { id: 'dashboard', label: 'Home',       icon: 'home', group: 'dock' },
-  { id: 'trades',    label: 'Trades',     icon: 'list', group: 'dock' },
   { id: 'stats',     label: 'Stats',      icon: 'bar',  group: 'dock' },
   { id: 'priority',  label: 'Setups',     icon: 'star', group: 'dock' },
   { id: 'journal',   label: 'Journal',    icon: 'book', group: 'dock' },
+  { id: 'reader',    label: 'Reader',     icon: 'read', group: 'dock' },
+  { id: 'trades',    label: 'Trades',     icon: 'list', group: 'hidden' },
   { id: 'entry',     label: 'New Trade',  icon: 'plus', group: 'fab' },
   { id: 'analytics', label: 'Analytics',  icon: 'bar',  group: 'menu' },
   { id: 'watchlist', label: 'Watchlist',  icon: 'eye',  group: 'menu' },
   { id: 'strategy',  label: 'Strategy',   icon: 'book', group: 'menu' },
-  { id: 'reader',    label: 'Reader',     icon: 'read', group: 'menu' },
   { id: 'settings',  label: 'Settings',   icon: 'cog',  group: 'menu' },
   { id: 'ai',        label: 'AI',         icon: 'ai',   group: 'hidden' },
 ];
@@ -2435,7 +2429,10 @@ function renderTabs() {
     `<button class="dock-btn" data-tab="${t.id}"><span class="dock-icon">${ICONS[t.icon] || ''}</span><span>${t.label}</span></button>`
   ).join('');
   dock.querySelectorAll('.dock-btn[data-tab]').forEach(btn => {
-    btn.onclick = () => switchTab(btn.dataset.tab);
+    // Reader keeps its popup menu (Home / Browser / Photos / Daily Brief), now
+    // anchored to the dock button instead of the old header icon.
+    if (btn.dataset.tab === 'reader') btn.onclick = (e) => openReaderMenu(e);
+    else btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
   // Sidebar drawer — secondary items
@@ -2458,6 +2455,8 @@ function headerBrandClick() {
 }
 
 function switchTab(tabId) {
+  // Trades now lives at the bottom of the Stats panel — route any old links there.
+  if (tabId === 'trades') tabId = 'stats';
   activeTab = tabId;
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById(`panel-${tabId}`);
@@ -2628,8 +2627,10 @@ function closeReaderMenu() {
 function openReaderMenu(e) {
   if (e) e.stopPropagation();
   if (document.getElementById('readerMenu')) { closeReaderMenu(); return; }
-  const btn = document.getElementById('readerBtn');
+  const btn = (e && e.currentTarget) || document.querySelector('.dock-btn[data-tab="reader"]') || document.getElementById('readerBtn');
+  if (!btn) return;
   const r = btn.getBoundingClientRect();
+  const openUp = r.top > window.innerHeight / 2; // dock sits at the bottom → open the menu upward
   const ic = {
     home: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/></svg>',
     browse: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.3 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.3-3.6-8.5S9.6 5.8 12 3.5Z"/></svg>',
@@ -2640,7 +2641,8 @@ function openReaderMenu(e) {
   menu.id = 'readerMenu';
   menu.className = 'header-menu open';
   menu.style.position = 'fixed';
-  menu.style.top = (r.bottom + 6) + 'px';
+  if (openUp) { menu.style.bottom = (window.innerHeight - r.top + 6) + 'px'; menu.style.top = 'auto'; }
+  else { menu.style.top = (r.bottom + 6) + 'px'; menu.style.bottom = 'auto'; }
   menu.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
   menu.style.left = 'auto';
   menu.style.width = '210px';
@@ -2724,26 +2726,39 @@ function updateMarketStatus() {
 async function fetchLivePrices(symbols) {
   if (!symbols || !symbols.length) return {};
   const suffix = state.settings.exchange === 'NSE' ? 'NS' : 'BO';
-  const tickers = symbols.map(s => `${encodeURIComponent(s)}.${suffix}`).join(',');
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${tickers}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const result = {};
-    (data.quoteResponse?.result || []).forEach(q => {
-      const sym = q.symbol.replace(`.${suffix}`, '');
-      result[sym] = {
-        price: q.regularMarketPrice,
-        change: q.regularMarketChange,
-        changePct: q.regularMarketChangePercent,
-        prevClose: q.regularMarketPreviousClose
-      };
-    });
-    return result;
-  } catch (e) {
-    return {};
+  // Yahoo blocks direct browser calls (CORS) and the v7 quote endpoint now needs
+  // a crumb/cookie. The v8 chart endpoint works crumb-free, so fetch it per
+  // symbol through the CORS proxy pool (first proxy that returns a price wins).
+  const proxies = [
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+    u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
+  ];
+  async function one(sym) {
+    const ticker = `${sym}.${suffix}`;
+    const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+    for (const p of proxies) {
+      try {
+        const res = await fetch(p(target));
+        if (!res.ok) continue;
+        const data = await res.json();
+        const meta = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
+        const price = meta && (typeof meta.regularMarketPrice === 'number' ? meta.regularMarketPrice : null);
+        if (price == null) continue;
+        const prev = (typeof meta.chartPreviousClose === 'number' ? meta.chartPreviousClose
+                    : typeof meta.previousClose === 'number' ? meta.previousClose : price);
+        return [sym, { price, change: price - prev, changePct: prev ? ((price - prev) / prev) * 100 : 0, prevClose: prev }];
+      } catch (e) {}
+    }
+    return null;
   }
+  const out = {};
+  const batchSize = 6; // gentle on the free proxies
+  for (let i = 0; i < symbols.length; i += batchSize) {
+    const results = await Promise.all(symbols.slice(i, i + batchSize).map(one));
+    results.forEach(r => { if (r) out[r[0]] = r[1]; });
+  }
+  return out;
 }
 
 async function refreshAllPrices(opts) {
@@ -3474,7 +3489,7 @@ function renderStats() {
     <div class="card" style="margin-top: 14px;">
       <div class="card-header">
         <h3 class="card-title">Latest Trades</h3>
-        <button class="btn-ghost btn btn-sm" onclick="switchTab('trades')">See all →</button>
+        <button class="btn-ghost btn btn-sm" onclick="document.getElementById('tradesHost')&&document.getElementById('tradesHost').scrollIntoView({behavior:'smooth'})">See all →</button>
       </div>
       ${latest.length ? latest.map(t => {
         const np = netPnl(t);
@@ -3499,7 +3514,10 @@ function renderStats() {
         `;
       }).join('') : '<div style="color: var(--text-muted); padding: 24px 0; text-align: center; font-size: 13px;">No closed trades in this period</div>'}
     </div>
+
+    <div id="tradesHost" style="margin-top: 28px; padding-top: 4px; border-top: 1px solid var(--border-subtle);"></div>
   `;
+  renderTrades(); // Trades section now lives at the bottom of Stats
 }
 
 function setDashboardRange(r) { dashboardRange = r; renderStats(); }
@@ -3764,11 +3782,15 @@ function openDayNote(key) {
    TRADES
    ======================================================================== */
 function renderTrades() {
+  // Trades render into a host inside the Stats panel (its dock tab was removed);
+  // fall back to the legacy panel element if that host isn't mounted.
+  const host = document.getElementById('tradesHost') || document.getElementById('panel-trades');
+  if (!host) return;
   const allTags = new Set();
   state.trades.forEach(t => (t.tags || []).forEach(tag => allTags.add(tag)));
   const tags = [...allTags].sort();
 
-  document.getElementById('panel-trades').innerHTML = `
+  host.innerHTML = `
     <div class="page-header">
       <div>
         <h1 class="page-title">Trades</h1>
@@ -7851,13 +7873,11 @@ async function init() {
   setInterval(updateMarketStatus, 1000);
   setupAutoRefresh();
   document.getElementById('searchBtn').onclick = openSearchModal;
-  document.getElementById('readerBtn').onclick = openReaderMenu;
   document.getElementById('themeToggleBtn').onclick = toggleTheme;
   document.getElementById('menuBtn').onclick = openDrawer;
   document.getElementById('drawerCloseBtn').onclick = closeDrawer;
   document.getElementById('drawerOverlay').onclick = closeDrawer;
   document.getElementById('aiBtn').onclick = onAiClick;
-  document.getElementById('readerArrowBtn').onclick = () => switchTab('reader');
   // Close the header dropdown when clicking anywhere outside it
   document.addEventListener('click', (e) => {
     const menu = document.getElementById('headerMenu');
