@@ -7543,6 +7543,9 @@ async function importZerodhaTradebook(event) {
       g.netPnl = g.realizedPnl !== null ? round2(g.realizedPnl - g.charges) : null;
       g.openingSellQty = openingSellQty;                               // pre-held shares sold (no cost basis)
       g.openingSellValue = round2(openingSellValue);
+      g.openingSellAvg = round2(openingSellQty > 0 ? openingSellValue / openingSellQty : 0);
+      g.openingBuyPrice = null;                                        // user can supply the pre-period cost
+      g.openingPnl = 0;
       g.status = openQty > 0 ? 'open' : 'closed';
       g.assignTo = openQty > 0 ? 'core' : 'satellite';
       // True when some shares were sold but position is still open (partial close)
@@ -7612,7 +7615,14 @@ async function importZerodhaTradebook(event) {
                 <div><div style="font-size:10px;color:var(--text-subtle);text-transform:uppercase;letter-spacing:.05em;">Realized P&amp;L (net)</div><div id="z-pnl-${i}" style="font-size:13px;font-weight:600;${pnlColor}" title="Gross ${formatPnl(g.realizedPnl)} − est. charges ${formatINR(g.charges)}">${g.netPnl !== null ? formatPnl(g.netPnl) : '—'}</div></div>
                 ` : ''}
               </div>
-              ${g.openingSellQty > 0 ? `<div style="margin-top:8px;font-size:11.5px;color:var(--warning,#f59e0b);background:rgba(245,158,11,.08);border-radius:6px;padding:6px 9px;line-height:1.4;">⚠️ ${g.openingSellQty} share${g.openingSellQty === 1 ? ' was' : 's were'} sold before any buy in this file (held from before this period). Their buy cost isn't in the tradebook, so they're excluded from P&amp;L.</div>` : ''}
+              ${g.openingSellQty > 0 ? `<div style="margin-top:8px;font-size:11.5px;color:var(--warning,#f59e0b);background:rgba(245,158,11,.08);border-radius:6px;padding:8px 9px;line-height:1.45;">
+                  ⚠️ ${g.openingSellQty} share${g.openingSellQty === 1 ? ' was' : 's were'} sold @ ${formatINR(g.openingSellAvg)} before any buy in this file (held from before this period).
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:6px;color:var(--text);">
+                    <span style="font-size:11px;">Opening buy price (optional):</span>
+                    <input id="z-openbuy-${i}" type="number" step="0.01" min="0" placeholder="cost/share" oninput="zRecalcPnl(${i})" style="width:110px;font-size:13px;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2,var(--surface-3));color:var(--text);">
+                  </div>
+                  <div style="font-size:10.5px;margin-top:4px;color:var(--text-muted);">Leave blank to exclude these shares from P&amp;L.</div>
+                </div>` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -7648,6 +7658,24 @@ async function importZerodhaTradebook(event) {
           createdAt: now
         });
       };
+      // Records the pre-held (opening) lot as a closed trade — only when the user
+      // supplied its buy cost, otherwise those shares are left out entirely.
+      const pushOpeningTrade = (g) => {
+        if (g.openingBuyPrice == null || !g.openingSellQty) return;
+        const r2 = x => Math.round((Number(x) || 0) * 100) / 100;
+        state.trades.push({
+          id: generateId(), portfolioType: 'satellite', status: 'closed', category: 'stocks',
+          symbol: g.symbol, tradeName: 'Imported from Zerodha (opening lot)',
+          entryPrice: g.openingBuyPrice, entryQty: g.openingSellQty,
+          entryDate: now, entryDesc: 'Pre-period holding — opening cost entered at import',
+          exitPrice: g.openingSellAvg, exitQty: g.openingSellQty,
+          exitDate: g.lastSellDate ? new Date(g.lastSellDate).toISOString() : now,
+          realizedPnl: r2((g.openingSellAvg - g.openingBuyPrice) * g.openingSellQty),
+          commission: r2(estimateCommission((g.openingBuyPrice + g.openingSellAvg) * g.openingSellQty)),
+          closedAt: g.lastSellDate ? new Date(g.lastSellDate).toISOString() : now,
+          tags: ['zerodha-import'], createdAt: now
+        });
+      };
 
       document.querySelectorAll('#zerodhaTable .z-row-cb').forEach(cb => {
         if (!cb.checked) return;   // unchecked = skip
@@ -7655,6 +7683,8 @@ async function importZerodhaTradebook(event) {
         const sel = document.querySelector(`.z-assign-sel[data-idx="${idx}"]`);
         const choice = sel ? sel.value : 'satellite';
         const g = symbols[idx];
+
+        pushOpeningTrade(g); // pre-held lot, if its cost was entered
 
         if (choice === 'update') {
           // Merge tradebook data into the existing portfolio or open trade entry
@@ -7751,19 +7781,25 @@ async function importZerodhaTradebook(event) {
 function zRecalcPnl(i) {
   const g = window._zSymbols && window._zSymbols[i];
   if (!g) return;
-  const inp = document.getElementById('z-avgsell-' + i);
+  const r2 = x => Math.round((Number(x) || 0) * 100) / 100;
   const cell = document.getElementById('z-pnl-' + i);
-  if (!inp || !cell) return;
-  let v = parseFloat(inp.value);
-  if (isNaN(v) || v < 0) { cell.textContent = '—'; return; }
-  v = Math.round(v * 100) / 100;
-  g.avgSell = v;
-  g.realizedPnl = Math.round((v - g.avgBuyMatched) * g.netSellQty * 100) / 100;
-  g.charges = Math.round(estimateCommission(g.avgBuyMatched * g.netSellQty + v * g.netSellQty) * 100) / 100;
-  g.netPnl = Math.round((g.realizedPnl - g.charges) * 100) / 100;
-  cell.textContent = formatPnl(g.netPnl);
-  cell.style.color = g.netPnl >= 0 ? 'var(--success,#22c55e)' : 'var(--danger,#ef4444)';
-  cell.title = `Gross ${formatPnl(g.realizedPnl)} − est. charges ${formatINR(g.charges)}`;
+  if (!cell) return;
+  // Matched (closed) portion — driven by the editable Avg Sell.
+  const sellInp = document.getElementById('z-avgsell-' + i);
+  if (sellInp) { const v = parseFloat(sellInp.value); if (!isNaN(v) && v >= 0) g.avgSell = r2(v); }
+  g.realizedPnl = g.netSellQty > 0 ? r2((g.avgSell - g.avgBuyMatched) * g.netSellQty) : null;
+  // Opening (pre-held) portion — only counted once the user supplies a buy cost.
+  g.openingBuyPrice = null; g.openingPnl = 0;
+  const openInp = document.getElementById('z-openbuy-' + i);
+  if (openInp) { const b = parseFloat(openInp.value); if (!isNaN(b) && b > 0 && g.openingSellQty > 0) { g.openingBuyPrice = r2(b); g.openingPnl = r2((g.openingSellAvg - b) * g.openingSellQty); } }
+  const gross = r2((g.realizedPnl || 0) + (g.openingPnl || 0));
+  const turnover = g.avgBuyMatched * g.netSellQty + g.avgSell * g.netSellQty
+    + (g.openingBuyPrice != null ? (g.openingBuyPrice + g.openingSellAvg) * g.openingSellQty : 0);
+  g.charges = r2(estimateCommission(turnover));
+  g.netPnl = (g.netSellQty > 0 || g.openingBuyPrice != null) ? r2(gross - g.charges) : null;
+  cell.textContent = g.netPnl !== null ? formatPnl(g.netPnl) : '—';
+  cell.style.color = (g.netPnl || 0) >= 0 ? 'var(--success,#22c55e)' : 'var(--danger,#ef4444)';
+  cell.title = `Gross ${formatPnl(gross)} − est. charges ${formatINR(g.charges)}`;
 }
 
 function zerodhaToggleRow(gi, ri, checked) {
