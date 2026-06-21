@@ -3602,7 +3602,7 @@ function journalDailyHTML() {
     const losses = trades.filter(t => netPnl(t) < 0).length;
     const wr = trades.length ? Math.round(wins / trades.length * 100) : 0;
     const note = (state.journalNotes || {})[key];
-    const pills = trades.map(t => `<span class="pill ${netPnl(t) >= 0 ? 'win' : 'loss'}">${escapeHtml(t.symbol)}</span>`).join('');
+    const pills = trades.map(t => `<span class="pill ${netPnl(t) >= 0 ? 'win' : 'loss'}" style="cursor:pointer;" onclick="openJournalTrade('${t.id}')" title="Open trade">${escapeHtml(t.symbol)}</span>`).join('');
     return `
       <div class="jcard">
         <div class="jcard-date">
@@ -3775,6 +3775,30 @@ function shortMoney(n) {
 }
 
 // ---- Journal day detail + notes ----
+// Open the trade behind a journal label/pill. Satellite trades open the full
+// edit modal; core-closed records (which aren't in state.trades) get a read-only
+// detail modal.
+function openJournalTrade(id) {
+  if (!id) return;
+  const t = (state.trades || []).find(x => x.id === id);
+  if (t) { openEditTradeModal(id); return; }
+  const c = (state.coreClosed || []).find(x => x.id === id);
+  if (!c) return;
+  const np = netPnl(c), pct = tradeGainPct(c);
+  const qty = c.entryQty || c.qty || c.exitQty || '';
+  const buy = (c.entryPrice != null ? c.entryPrice : c.avgPrice);
+  const body = `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="jg-row"><span>Symbol</span><span class="mono">${escapeHtml(c.symbol)}</span></div>
+      ${qty !== '' ? `<div class="jg-row"><span>Quantity</span><span>${escapeHtml(String(qty))}</span></div>` : ''}
+      ${buy != null ? `<div class="jg-row"><span>Avg Buy</span><span>${formatINR(buy)}</span></div>` : ''}
+      ${c.exitPrice != null ? `<div class="jg-row"><span>Exit</span><span>${formatINR(c.exitPrice)}</span></div>` : ''}
+      <div class="jg-row"><span>Net P&amp;L</span><span class="${pnlClass(np)}">${formatPnl(np)}${pct != null ? ` (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)` : ''}</span></div>
+      ${c.closedAt ? `<div class="jg-row"><span>Closed</span><span>${formatDate(c.closedAt)}</span></div>` : ''}
+    </div>`;
+  showModal({ title: `${escapeHtml(c.symbol)} · Core (closed)`, body });
+}
+
 function openDayTrades(key) {
   const trades = allClosedTrades().filter(t => dayKey(t.closedAt) === key)
     .sort((a, b) => new Date(a.closedAt) - new Date(b.closedAt));
