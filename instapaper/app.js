@@ -35,19 +35,21 @@ const fontCss=id=>{const f=FONTS.find(f=>f.id===id);return(f?f.css:FONTS[0].css)
 const WORDMARK="'Playfair Display','Lora',Georgia,serif";
 const UIF="-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif";
 
-const DEFAULT_SETTINGS={theme:'light',font:'Lora',fontSize:19,lineHeight:1.62,sort:'newest',filter:'all',typeFilter:'article',readFilter:'unread',hideRead:false,ttsRate:1,ttsVoice:'',wpm:380,justify:false,aiKey:'',aiModel:'deepseek/deepseek-r1-0528:free',aiLang:'English',aiProvider:'openrouter',geminiKey:'',geminiModel:'gemini-2.5-flash'};
+const DEFAULT_SETTINGS={theme:'light',font:'Lora',fontSize:19,lineHeight:1.62,sort:'newest',filter:'all',typeFilter:'article',readFilter:'unread',hideRead:false,ttsRate:1,ttsVoice:'',wpm:380,justify:false,aiKey:'',aiModel:'meta-llama/llama-3.3-70b-instruct:free',aiLang:'English',aiProvider:'openrouter',geminiKey:'',geminiModel:'gemini-2.5-flash-lite'};
 
 /* models OpenRouter has retired — saved settings get migrated to the new default */
 const DEAD_MODELS=['deepseek/deepseek-chat-v3-0324:free','deepseek/deepseek-r1:free'];
 
 /* ============================== AI (OpenRouter) ============================== */
 const AI_MODELS=[
-  ['deepseek/deepseek-r1-0528:free','DeepSeek R1 0528 (free)'],
-  ['deepseek/deepseek-r1-0528-qwen3-8b:free','DeepSeek R1 0528 Qwen3 8B (free)'],
-  ['meta-llama/llama-3.3-70b-instruct:free','Llama 3.3 70B (free)'],
+  // fast, non-reasoning models first — these feel instant; reasoning models (R1)
+  // spend a long time "thinking" before answering, so they're listed lower.
+  ['meta-llama/llama-3.3-70b-instruct:free','Llama 3.3 70B (free, fast)'],
+  ['google/gemini-2.0-flash-exp:free','Gemini 2.0 Flash (free, fast)'],
+  ['mistralai/mistral-small-3.1-24b-instruct:free','Mistral Small 3.1 (free, fast)'],
   ['qwen/qwen3-235b-a22b:free','Qwen3 235B (free)'],
-  ['google/gemini-2.0-flash-exp:free','Gemini 2.0 Flash (free)'],
-  ['mistralai/mistral-small-3.1-24b-instruct:free','Mistral Small 3.1 (free)'],
+  ['deepseek/deepseek-r1-0528:free','DeepSeek R1 0528 (free, slow · reasoning)'],
+  ['deepseek/deepseek-r1-0528-qwen3-8b:free','DeepSeek R1 0528 Qwen3 8B (free, reasoning)'],
   ['deepseek/deepseek-chat-v3-0324','DeepSeek V3 (paid)'],
   ['openai/gpt-4o-mini','GPT-4o mini (paid)'],
   ['anthropic/claude-3.5-haiku','Claude 3.5 Haiku (paid)'],
@@ -180,7 +182,10 @@ async function geminiVideo(key,model,prompt,url,maxTokens,onWait){
 function aiVideo(S,prompt,url,maxTokens,onWait){
   if(S.aiProvider!=='gemini'||!S.geminiKey)
     return Promise.reject(new Error('Video AI is powered by Google Gemini. Open Settings → AI, switch to Gemini, and add a free key from aistudio.google.com/apikey.'));
-  return geminiVideo(S.geminiKey,S.geminiModel||'gemini-2.5-flash',prompt,url,maxTokens,onWait);
+  // flash-lite is the fast default for text, but the video-understanding fallback
+  // needs a fuller model — bump lite up to 2.5 Flash for reliability on long videos.
+  const vm=/flash-lite|lite/.test(S.geminiModel||'')?'gemini-2.5-flash':(S.geminiModel||'gemini-2.5-flash');
+  return geminiVideo(S.geminiKey,vm,prompt,url,maxTokens,onWait);
 }
 
 /* live model catalog from OpenRouter — only models that can actually chat */
@@ -726,6 +731,125 @@ async function fetchYouTubeMeta(url,id){
     }catch(e){}
   }
   return{title,author,image:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg'};
+}
+
+/* ---------- YouTube transcript via real caption tracks ----------
+   Reads the video's own subtitles — instant, exact, free, and no model needed.
+   This is the primary path for video transcript/summary/Q&A; the slow Gemini
+   "watch the whole video" approach is only a fallback when captions are absent.
+   Caption tracks are discovered through the InnerTube player API (a POST that
+   isn't gated by the cookie-consent wall) and, failing that, by scraping the
+   watch page — both routed through the proxy pool. */
+function captionTracksFromText(txt){
+  // pull the captionTracks array out of a player-response JSON blob or watch-page
+  // HTML. Each track object nests its own arrays (name.runs), so a balanced
+  // bracket scan is used rather than a naive regex.
+  const s=String(txt||''),i=s.indexOf('"captionTracks":');
+  if(i<0)return null;
+  let j=s.indexOf('[',i);if(j<0)return null;
+  let depth=0,inStr=false,esc=false,end=-1;
+  for(let k=j;k<s.length;k++){
+    const c=s[k];
+    if(inStr){ if(esc)esc=false; else if(c==='\\')esc=true; else if(c==='"')inStr=false; }
+    else if(c==='"')inStr=true;
+    else if(c==='[')depth++;
+    else if(c===']'){if(--depth===0){end=k+1;break}}
+  }
+  if(end<0)return null;
+  try{return JSON.parse(s.slice(j,end))}catch(e){return null}
+}
+function pickCaptionTrack(tracks,code){
+  if(!tracks||!tracks.length)return null;
+  const want=String(code||'').toLowerCase();
+  const lc=c=>String(c.languageCode||'').toLowerCase();
+  const isAsr=c=>c.kind==='asr';
+  return (want&&tracks.find(c=>lc(c).indexOf(want)===0&&!isAsr(c)))   // manual, target language
+    ||tracks.find(c=>lc(c).indexOf('en')===0&&!isAsr(c))              // manual English
+    ||(want&&tracks.find(c=>lc(c).indexOf(want)===0))                 // any track in target language
+    ||tracks.find(c=>lc(c).indexOf('en')===0)                        // any English (incl. auto)
+    ||tracks.find(c=>!isAsr(c))                                      // any manual track
+    ||tracks[0];                                                     // whatever exists
+}
+async function fetchCaptionTracks(videoId){
+  // 1) InnerTube player API — POST, consent-proof. Route through proxies that forward POST.
+  const api='https://www.youtube.com/youtubei/v1/player?key='+YT_INNERTUBE_KEY+'&prettyPrint=false';
+  const body=JSON.stringify({context:{client:{clientName:'WEB',clientVersion:'2.20240726.00.00',hl:'en',gl:'US'}},videoId});
+  const postWraps=[u=>'https://corsproxy.io/?url='+encodeURIComponent(u),u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)];
+  for(const w of postWraps){
+    try{
+      const res=await fetchWithTimeout(w(api),{method:'POST',headers:{'Content-Type':'application/json'},body},20000);
+      if(!res.ok)continue;
+      const tr=captionTracksFromText(await res.text());
+      if(tr&&tr.length)return tr;
+    }catch(e){}
+  }
+  // 2) Scrape the watch page through the proxy pool.
+  try{
+    const raw=await fetchRawAcross('https://www.youtube.com/watch?v='+videoId,t=>/captionTracks/.test(t));
+    const tr=captionTracksFromText(raw);
+    if(tr&&tr.length)return tr;
+  }catch(e){}
+  return null;
+}
+function parseCaptionJson3(txt){
+  let j;try{j=JSON.parse(txt)}catch(e){return[]}
+  const out=[];
+  (j.events||[]).forEach(ev=>{
+    if(!ev.segs)return;
+    const line=ev.segs.map(s=>s.utf8||'').join('').replace(/\s+/g,' ').trim();
+    if(line&&line!=='\n')out.push(line);
+  });
+  return out;
+}
+function parseCaptionXml(xml){
+  const out=[];const re=/<text[^>]*>([\s\S]*?)<\/text>/g;let m;
+  while((m=re.exec(xml))){
+    // timedtext XML often double-encodes (&amp;#39;) — decode twice for clean text
+    const t=unescapeEnt(unescapeEnt(m[1].replace(/<[^>]+>/g,''))).replace(/\s+/g,' ').trim();
+    if(t)out.push(t);
+  }
+  return out;
+}
+async function fetchCaptionLines(baseUrl,tlang){
+  let u=String(baseUrl||'').replace(/&amp;/g,'&').replace(/\\u0026/g,'&');
+  if(!u)return[];
+  if(tlang&&!/[?&]tlang=/.test(u))u+='&tlang='+encodeURIComponent(tlang); // let YouTube auto-translate
+  const jsonUrl=u.replace(/&fmt=[^&]*/,'')+'&fmt=json3'; // force the clean JSON format
+  try{
+    const raw=await fetchRawAcross(jsonUrl,t=>/"events"|"wireMagic"/.test(t));
+    const lines=parseCaptionJson3(raw);
+    if(lines.length)return lines;
+  }catch(e){}
+  try{ // fall back to the default XML/srv format
+    const raw=await fetchRawAcross(u,t=>/<text/.test(t));
+    const lines=parseCaptionXml(raw);
+    if(lines.length)return lines;
+  }catch(e){}
+  return[];
+}
+/* reflow a flat list of caption cues into readable paragraphs */
+function captionsToText(lines){
+  const joined=lines.join(' ').replace(/\s+/g,' ').trim();
+  if(!joined)return'';
+  const sents=joined.match(/[^.!?]+[.!?]+(?:["')\]]+)?|\S[^.!?]*$/g)||[joined];
+  const paras=[];
+  for(let i=0;i<sents.length;i+=4)paras.push(sents.slice(i,i+4).join(' ').replace(/\s+/g,' ').trim());
+  return paras.filter(Boolean).join('\n\n');
+}
+/* Returns clean transcript text for a video, or '' if it has no captions.
+   `outLang` is the desired language name; non-English asks YouTube to translate. */
+async function fetchYtTranscript(url,videoId,outLang,onWait){
+  videoId=videoId||ytIdOf(url);
+  if(!videoId)return'';
+  if(onWait)onWait('Reading captions…');
+  const tracks=await fetchCaptionTracks(videoId);
+  if(!tracks||!tracks.length)return'';
+  const code=(outLang&&LANG_CODES[outLang])||'';
+  const track=pickCaptionTrack(tracks,code||'en');
+  if(!track||!track.baseUrl)return'';
+  const needTranslate=code&&code!=='en'&&String(track.languageCode||'').toLowerCase().indexOf(code)!==0;
+  const lines=await fetchCaptionLines(track.baseUrl,needTranslate?code:'');
+  return captionsToText(lines);
 }
 
 /* ---- social posts (X / Instagram / Telegram) saved as link cards ---- */
@@ -2162,23 +2286,51 @@ function AISheet({T,S,article,articles,update,onClose,onSaveCopy,onSaveNote,toas
   const outLang=S.aiLang||'English';
   const setLang=l=>update(d=>({...d,settings:{...d.settings,aiLang:l}}));
   const ctxText=ctx?((ctx.title||'')+'\n\n'+(ctx.text||'')).slice(0,15000):'';
-  const isVid=!!(ctx&&ctx.isVideo); // videos are summarised/transcribed via Gemini's video understanding
+  const isVid=!!(ctx&&ctx.isVideo); // videos: real captions first, Gemini video understanding only as a fallback
+  const capRef=useRef({}); // videoId -> {text,lang} cached caption transcript for this session
 
   const run=async(label,fn)=>{
     setError('');setBusy(label);
     try{await fn()}catch(e){setError((e&&e.message)||'Something went wrong');setView('menu')}
     setBusy('');
   };
+  /* Real transcript from the video's own caption track — instant, exact, free.
+     Cached per session so Summarize/Ask/Transcript don't refetch. '' if none. */
+  const getCaptions=async()=>{
+    if(!ctx||!ctx.isVideo)return'';
+    const k=ctx.videoId||ctx.url,hit=capRef.current[k];
+    if(hit&&hit.lang===outLang)return hit.text;
+    const text=await fetchYtTranscript(ctx.url,ctx.videoId,outLang,setBusy);
+    capRef.current[k]={text,lang:outLang};
+    return text;
+  };
   const doSummarize=()=>run('Summarizing…',async()=>{
-    const out=isVid
-      ?await aiVideo(S,'Summarize this video as 5–8 concise bullet points covering the key ideas, followed by one line starting with "Takeaway:". Respond entirely in '+outLang+'.',ctx.url,1600,setBusy)
-      :await aiChat(S,[
+    let out;
+    if(isVid){
+      const cap=await getCaptions();
+      if(cap){
+        setBusy('Summarizing transcript…');
+        out=await aiChat(S,[
+          {role:'system',content:'You are a precise assistant.'},
+          {role:'user',content:'Summarize this video transcript as 5–8 concise bullet points covering the key ideas, followed by one line starting with "Takeaway:". Respond entirely in '+outLang+'.\n\nTRANSCRIPT:\n'+cap.slice(0,30000)}],1600,setBusy);
+      }else{ // no captions — fall back to Gemini watching the video
+        setBusy('Summarizing video…');
+        out=await aiVideo(S,'Summarize this video as 5–8 concise bullet points covering the key ideas, followed by one line starting with "Takeaway:". Respond entirely in '+outLang+'.',ctx.url,1600,setBusy);
+      }
+    }else{
+      out=await aiChat(S,[
         {role:'system',content:'You are a precise reading assistant.'},
         {role:'user',content:'Summarize the following article as 5–8 concise bullet points followed by one line starting with "Takeaway:". Respond entirely in '+outLang+'.\n\n'+ctxText}],1600,setBusy);
+    }
     setResult({kind:'Summary',text:out,lang:outLang});setView('result');
   });
-  const doTranscript=()=>run('Transcribing…',async()=>{
-    const out=await aiVideo(S,'Transcribe everything spoken in this video into clean, readable text. Use natural paragraphs. Do NOT add timestamps, speaker labels, or any commentary — output only the spoken words'+(outLang!=='English'?', translated into '+outLang:'')+'.',ctx.url,8192,setBusy);
+  const doTranscript=()=>run('Reading captions…',async()=>{
+    let out=await getCaptions();
+    if(!out){ // video has no captions — fall back to Gemini video understanding
+      setBusy('Transcribing with Gemini…');
+      out=await aiVideo(S,'Transcribe everything spoken in this video into clean, readable text. Use natural paragraphs. Do NOT add timestamps, speaker labels, or any commentary — output only the spoken words'+(outLang!=='English'?', translated into '+outLang:'')+'.',ctx.url,8192,setBusy);
+    }
+    if(!out||!out.trim())throw new Error('No transcript available for this video.');
     setResult({kind:'Transcript',text:out,lang:outLang,transcript:true});setView('result');
   });
   const doTranslate=lang=>run('Translating…',async()=>{
@@ -2203,7 +2355,14 @@ function AISheet({T,S,article,articles,update,onClose,onSaveCopy,onSaveNote,toas
   const doAsk=()=>{const q=question.trim();if(!q)return;run('Thinking…',async()=>{
     let out;
     if(isVid){
-      out=await aiVideo(S,'Answer this question about the video. Be concise and concrete, using only what the video actually says. Respond in '+outLang+'.\n\nQuestion: '+q,ctx.url,2000,setBusy);
+      const cap=await getCaptions();
+      if(cap){
+        out=await aiChat(S,[
+          {role:'system',content:'Answer the question using only this video transcript. Be concise and concrete. Respond in '+outLang+'.\n\nTRANSCRIPT:\n'+cap.slice(0,30000)},
+          {role:'user',content:q}],2000,setBusy);
+      }else{
+        out=await aiVideo(S,'Answer this question about the video. Be concise and concrete, using only what the video actually says. Respond in '+outLang+'.\n\nQuestion: '+q,ctx.url,2000,setBusy);
+      }
     }else{
       const msgs=ctx
         ?[{role:'system',content:'Answer using the article below. Be concise and concrete. Respond in '+outLang+'.\n\nARTICLE:\n'+ctxText},{role:'user',content:q}]
