@@ -2695,6 +2695,16 @@ function BookmarkTile({T,site,onOpen,onLongPress}){
       h('img',{src:faviconUrl(site.url),alt:'',style:{width:30,height:30},onError:e=>{e.target.style.opacity=0}})),
     h('span',{style:{fontSize:11.5,color:T.meta,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},site.name));
 }
+/* Folder shown as a tile in the same grid as bookmarks — a rounded square with a
+   folder glyph and the name below; tap opens it, long-press renames. */
+function BrowserFolderTile({T,folder,count,onOpen,onLongPress}){
+  const lp=useLongPress(onLongPress);
+  return h('button',Object.assign({onClick:onOpen},lp,{className:'act95',style:{display:'flex',flexDirection:'column',alignItems:'center',gap:7,minWidth:0,background:'none'}}),
+    h('span',{style:{position:'relative',width:54,height:54,borderRadius:14,background:T.card,display:'flex',alignItems:'center',justifyContent:'center',color:T.accent}},
+      Icons.folder(26),
+      count?h('span',{style:{position:'absolute',top:-4,right:-4,minWidth:18,height:18,padding:'0 5px',borderRadius:9,background:T.accent,color:T.bg,fontSize:10.5,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}},count):null),
+    h('span',{style:{fontSize:11.5,color:T.meta,maxWidth:'100%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},folder.name));
+}
 
 function Browser({T,sites,onSites,folders,onFolders,vault,onChangeVault,session,initialUrl,onClose}){
   const [input,setInput]=useState('');
@@ -2714,6 +2724,7 @@ function Browser({T,sites,onSites,folders,onFolders,vault,onChangeVault,session,
     h('span',{style:{width:54,height:54,borderRadius:14,border:'1.5px dashed '+T.sub,display:'flex',alignItems:'center',justifyContent:'center',color:T.sub}},Icons.plus(22)),
     h('span',{style:{fontSize:11.5,color:T.sub}},'Add'));
   const tile=st=>h(BookmarkTile,{key:st.id,T,site:st,onOpen:()=>open(st.url),onLongPress:()=>setActSite(st)});
+  const folderTile=f=>h(BrowserFolderTile,{key:f.id,T,folder:f,count:sites.filter(s=>s.folderId===f.id).length,onOpen:()=>setOpenFolder(f.id),onLongPress:()=>{setFName(f.name);setMkFolder({rename:f.id})}});
   const grid=children=>h('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14}},children);
   const loose=sites.filter(s=>!s.folderId||!folders.some(f=>f.id===s.folderId));
   const curFolder=openFolder?folders.find(f=>f.id===openFolder):null;
@@ -2731,16 +2742,9 @@ function Browser({T,sites,onSites,folders,onFolders,vault,onChangeVault,session,
       fSites.length?null:h('div',{style:{fontSize:12.5,color:T.sub,marginTop:18,textAlign:'center',lineHeight:1.5}},'No bookmarks here yet. Tap Add, or long-press a bookmark elsewhere and move it in.'));
   }else{
     body=h('div',null,
-      folders.length?h('div',null,
+      folders.length?h('div',{style:{marginBottom:20}},
         h('div',{style:lblS},'Folders'),
-        h('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:10,marginBottom:20}},
-          folders.map(f=>{const n=sites.filter(s=>s.folderId===f.id).length;
-            return h('button',{key:f.id,onClick:()=>setOpenFolder(f.id),className:'act96',style:{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderRadius:12,background:T.card,textAlign:'left',minWidth:0}},
-              h('span',{style:{color:T.accent,display:'flex',flexShrink:0}},Icons.folder(22)),
-              h('span',{style:{minWidth:0}},
-                h('span',{style:{display:'block',fontSize:14,fontWeight:600,color:T.fg,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},f.name),
-                h('span',{style:{display:'block',fontSize:11.5,color:T.sub}},n+(n===1?' site':' sites'))));
-          }))):null,
+        grid(folders.map(folderTile))):null,
       h('div',{style:lblS},'Bookmarks'),
       grid([...loose.map(tile),addBtn(()=>setAddForm({name:'',url:'',folderId:null}))]),
       h('button',{onClick:()=>{setFName('');setMkFolder({})},className:'act98',style:{display:'flex',alignItems:'center',gap:8,marginTop:18,padding:'11px 14px',borderRadius:11,border:'1px dashed '+T.hair,color:T.fg,fontSize:14,fontWeight:500}},Icons.plus(18),'New folder'),
